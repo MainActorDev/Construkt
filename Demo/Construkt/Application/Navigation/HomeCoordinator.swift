@@ -37,6 +37,47 @@ final class HomeCoordinator: BaseCoordinator, RouteHandlingCoordinator {
             
         case .search:
             onSwitchToExplore?()
+            
+        case .bottomSheet:
+            router.present(
+                ViewPresentable {
+                    VStackView(spacing: 16) {
+                        LabelView("Bottom Sheet Demo")
+                            .font(.systemFont(ofSize: 20, weight: .bold))
+                        LabelView("This is a configurable bottom sheet powered by Construkt Router")
+                            .color(.secondaryLabel)
+                            .alignment(.center)
+                            .numberOfLines(0)
+                    }
+                    .padding(h: 24, v: 24)
+                },
+                style: .configurable(.init(backgroundColor: .white, anchors: [.fraction(1.0)]))
+            )
+            
+        case .toast(let message, let position):
+            let config: ToastConfiguration = position == .top ? .topPop() : .bottomBounce()
+            router.showToast(
+                ViewPresentable {
+                    ZStackView {
+                        HStackView(spacing: 12) {
+                            ImageView(systemName: position == .top ? "arrow.up.circle.fill" : "checkmark.circle.fill")
+                                .tintColor(position == .top ? .systemBlue : .systemGreen)
+                                .contentMode(.scaleAspectFit)
+                                .size(width: 24, height: 24)
+                            LabelView(message)
+                                .font(.systemFont(ofSize: 15, weight: .medium))
+                                .color(.white)
+                        }
+                        .padding(h: 16, v: 14)
+                        .backgroundColor(UIColor.black.withAlphaComponent(0.85))
+                        .cornerRadius(12)
+                        .clipsToBounds(true)
+                        .alignment(.center)
+                    }
+                },
+                config: config
+            )
+            
         default: return false
         }
         

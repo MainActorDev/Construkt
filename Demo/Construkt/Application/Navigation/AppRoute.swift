@@ -10,4 +10,11 @@ public enum AppRoute: Codable, Equatable, Hashable, Sendable {
     case profile
     case web(url: URL)
     case back
+    case bottomSheet
+    case toast(message: String, position: ToastPosition)
+}
+
+public enum ToastPosition: String, Codable, Sendable {
+    case top
+    case bottom
 }

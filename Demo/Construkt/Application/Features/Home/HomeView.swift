@@ -11,6 +11,7 @@ struct HomeView: ViewConvertable {
     // We bind the viewModel at initialization.
     private let viewModel = MovieViewModel()
     
+    
     // MARK: - State
     
     /// Pure reactive data — observable, no UIKit dependency
@@ -50,67 +51,6 @@ struct HomeView: ViewConvertable {
     private let scrollBinding = ScrollBinding()
     private let handles = ViewHandles()
     private let autoscrollController = AutoscrollController()
-    
-    // MARK: - Walkthrough
-    
-    private enum WalkthroughStepId {
-        static let hero = "walkthrough-hero"
-        static let genres = "walkthrough-genres"
-        static let popular = "walkthrough-popular"
-        static let upcoming = "walkthrough-upcoming"
-        static let topRated = "walkthrough-topRated"
-    }
-    
-    private var walkthroughSteps: [WalkthroughStep] {
-        guard let cv = handles.collectionView else { return [] }
-        return [
-            WalkthroughStep(
-                target: .view(id: WalkthroughStepId.hero),
-                title: "Now Playing",
-                description: "Swipe through movies currently playing in theaters. Tap any poster to see details.",
-                tooltipPosition: .below,
-                spotlightPadding: 0,
-                prepare: { [weak handles] in
-                    await MainActor.run {
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: true)
-                    }
-                }
-            ),
-            WalkthroughStep(
-                target: .collectionViewSection(collectionView: cv, sectionIndex: 1),
-                title: "Genres",
-                description: "Browse movies by genre. Tap a category to explore its entire catalog.",
-                tooltipPosition: .below,
-                prepare: { [weak handles] in
-                    await MainActor.run {
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 1), at: .centeredVertically, animated: true)
-                    }
-                }
-            ),
-            WalkthroughStep(
-                target: .collectionViewSection(collectionView: cv, sectionIndex: 2),
-                title: "Popular Now",
-                description: "Discover what's trending. Tap \"See All\" for the full list.",
-                tooltipPosition: .below,
-                prepare: { [weak handles] in
-                    await MainActor.run {
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 2), at: .centeredVertically, animated: true)
-                    }
-                }
-            ),
-            WalkthroughStep(
-                target: .collectionViewSection(collectionView: cv, sectionIndex: 3),
-                title: "Upcoming",
-                description: "Stay ahead of the curve with upcoming releases.",
-                tooltipPosition: .above,
-                prepare: { [weak handles] in
-                    await MainActor.run {
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 3), at: .centeredVertically, animated: true)
-                    }
-                }
-            ),
-        ]
-    }
     
     // MARK: - Layout Constants
     
@@ -161,22 +101,10 @@ struct HomeView: ViewConvertable {
         }
         .contentUnderNavBar(false)
         .margins(bottom: 100)
-        .onHostDidLoad { [walkthroughSteps] in
+        .onHostDidLoad {
             viewModel.loadHomeData()
             // Show walkthrough after data loads
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                guard let window = UIApplication.shared.firstKeyWindow else { return }
-                
-                let overlay = WalkthroughOverlayView(steps: walkthroughSteps, onDismiss: nil)
-                overlay.translatesAutoresizingMaskIntoConstraints = false
-                window.addSubview(overlay)
-                NSLayoutConstraint.activate([
-                    overlay.topAnchor.constraint(equalTo: window.topAnchor),
-                    overlay.bottomAnchor.constraint(equalTo: window.bottomAnchor),
-                    overlay.leadingAnchor.constraint(equalTo: window.leadingAnchor),
-                    overlay.trailingAnchor.constraint(equalTo: window.trailingAnchor),
-                ])
-            }
+            showWalkthrough()
         }
         .onHostWillAppear { [handles, autoscrollController] _ in
             let totalItems = handles.collectionView?.numberOfItems(inSection: autoscrollController.currentSection) ?? 0
@@ -189,7 +117,7 @@ struct HomeView: ViewConvertable {
     }
     
     // MARK: - Sections
-
+    
     private var heroSection: AnySection {
         AnySection(id: HomeSection.hero, items: viewModel.nowPlayingMovies.map { Array($0.prefix(5)) }) { movie in
             AnyCell(movie, id: "hero-\(movie.id)") { movie in
@@ -338,6 +266,8 @@ struct HomeView: ViewConvertable {
         .onSelect { (ad: String) in
             print("Ad Selected: \(ad)")
         }
+        .onRoute { (ad: String) in AppRoute.bottomSheet }
+        .onRoute { (movie: Movie) in AppRoute.toast(message: "Selected: \(movie.title)", position: .bottom) }
         .layout { _ in
             HomeSection.topRated.layout
         }
@@ -346,8 +276,91 @@ struct HomeView: ViewConvertable {
         }
     }
     
+    // MARK: - Walkthrough
+    
+    private enum WalkthroughStepId {
+        static let hero = "walkthrough-hero"
+        static let genres = "walkthrough-genres"
+        static let popular = "walkthrough-popular"
+        static let upcoming = "walkthrough-upcoming"
+        static let topRated = "walkthrough-topRated"
+    }
+    
+    private var walkthroughSteps: [WalkthroughStep] {
+        guard let cv = handles.collectionView else { return [] }
+        return [
+            WalkthroughStep(
+                target: .view(id: WalkthroughStepId.hero),
+                title: "Now Playing",
+                description: "Swipe through movies currently playing in theaters. Tap any poster to see details.",
+                tooltipPosition: .below,
+                spotlightPadding: 0,
+                prepare: {
+                    await MainActor.run {  [weak handles] in
+                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: true)
+                    }
+                }
+            ),
+            WalkthroughStep(
+                target: .collectionViewSection(collectionView: cv, sectionIndex: 1),
+                title: "Genres",
+                description: "Browse movies by genre. Tap a category to explore its entire catalog.",
+                tooltipPosition: .below,
+                prepare: {
+                    await MainActor.run {  [weak handles] in
+                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 1), at: .centeredVertically, animated: true)
+                    }
+                }
+            ),
+            WalkthroughStep(
+                target: .collectionViewSection(collectionView: cv, sectionIndex: 2),
+                title: "Popular Now",
+                description: "Discover what's trending. Tap \"See All\" for the full list.",
+                tooltipPosition: .below,
+                prepare: {
+                    await MainActor.run { [weak handles] in
+                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 2), at: .centeredVertically, animated: true)
+                    }
+                }
+            ),
+            WalkthroughStep(
+                target: .collectionViewSection(collectionView: cv, sectionIndex: 3),
+                title: "Upcoming",
+                description: "Stay ahead of the curve with upcoming releases.",
+                tooltipPosition: .above,
+                prepare: {
+                    await MainActor.run { [weak handles] in
+                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 3), at: .centeredVertically, animated: true)
+                    }
+                }
+            ),
+        ]
+    }
+    
+    private func showWalkthrough() {
+        guard !viewModel.walkthroughShown else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            guard let window = UIApplication.shared.firstKeyWindow else { return }
+            
+            let overlay = WalkthroughOverlayView(
+                steps: walkthroughSteps,
+                onDismiss: { [viewModel] in
+                    viewModel.walkthroughShown = true
+                })
+            overlay.translatesAutoresizingMaskIntoConstraints = false
+            window.addSubview(overlay)
+            NSLayoutConstraint.activate([
+                overlay.topAnchor.constraint(equalTo: window.topAnchor),
+                overlay.bottomAnchor.constraint(equalTo: window.bottomAnchor),
+                overlay.leadingAnchor.constraint(equalTo: window.leadingAnchor),
+                overlay.trailingAnchor.constraint(equalTo: window.trailingAnchor),
+            ])
+        }
+    }
+    
+    
     // MARK: - Handlers
-
+    
     private func handleHeroScroll(
         items: [NSCollectionLayoutVisibleItem],
         offset: CGPoint,
