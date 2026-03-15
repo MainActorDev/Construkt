@@ -15,6 +15,7 @@ public enum ModalStyle {
     case pageSheet
     case fullScreen
     case formSheet
+    case configurable(SheetConfiguration)
     case custom((UIViewController) -> Void)
 }
 
@@ -26,6 +27,7 @@ public protocol ConstruktRouter: AnyObject {
     func popToRoot(animated: Bool)
     func present(_ module: ConstruktPresentable, style: ModalStyle, animated: Bool, completion: (() -> Void)?, receiver: AnyRouteReceiving?)
     func dismiss(animated: Bool, completion: (() -> Void)?)
+    func showToast(_ module: ConstruktPresentable, config: ToastConfiguration)
 }
 
 public extension ConstruktRouter {
@@ -51,6 +53,10 @@ public extension ConstruktRouter {
     
     func dismiss(animated: Bool = true, completion: (() -> Void)? = nil) {
         dismiss(animated: animated, completion: completion)
+    }
+    
+    func showToast(_ module: ConstruktPresentable, config: ToastConfiguration = .bottom()) {
+        showToast(module, config: config)
     }
 }
 
@@ -95,6 +101,13 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
     public func present(_ module: ConstruktPresentable, style: ModalStyle = .pageSheet, animated: Bool = true, completion: (() -> Void)? = nil, receiver: AnyRouteReceiving? = nil) {
         let vc = module.toPresentable()
         vc.associatedCoordinator = receiver
+        
+        if case let .configurable(config) = style {
+            let sheetVC = SheetController(content: vc, config: config)
+            topMostViewController().present(sheetVC, animated: animated, completion: completion)
+            return
+        }
+        
         switch style {
         case .pageSheet:
             vc.modalPresentationStyle = .pageSheet
@@ -129,6 +142,12 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
         topMostViewController().dismiss(animated: animated, completion: completion)
     }
     
+    public func showToast(_ module: ConstruktPresentable, config: ToastConfiguration = .bottom()) {
+        let vc = module.toPresentable()
+        guard let window = topMostWindow() else { return }
+        ToastManager.shared.show(content: vc, config: config, in: window)
+    }
+    
     // MARK: - UINavigationControllerDelegate
     
     public func navigationController(_ navigationController: UINavigationController, didShow viewController: UIViewController, animated: Bool) {
@@ -149,5 +168,16 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
         if let nav = base as? UINavigationController { return nav.visibleViewController.map { topMostViewController(base: $0) } ?? nav }
         if let tab = base as? UITabBarController { return tab.selectedViewController.map { topMostViewController(base: $0) } ?? tab }
         return base
+    }
+    
+    private func topMostWindow() -> UIWindow? {
+        if #available(iOS 15.0, *) {
+            return UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+        } else {
+            return UIApplication.shared.windows.first { $0.isKeyWindow }
+        }
     }
 }
