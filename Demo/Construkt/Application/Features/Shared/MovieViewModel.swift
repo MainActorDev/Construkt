@@ -35,7 +35,12 @@ public class MovieViewModel {
     public var isCastsLoading: AnyViewBinding<Bool> { casts.mapLoading() }
     public var isLoadingDetails: AnyViewBinding<Bool> { isDetailsLoading.map { $0 } }
     
-    public func selectMovie(_ movie: Movie) {        
+    var walkthroughShown: Bool {
+        get { UserDefaults.standard.bool(forKey: "walkthrough_shown") }
+        set { UserDefaults.standard.set(newValue, forKey: "walkthrough_shown") }
+    }
+    
+    public func selectMovie(_ movie: Movie) {
         self.isDetailsLoading.wrappedValue = true
         Task {
             self.fetchMovieCasts(id: movie.id)
