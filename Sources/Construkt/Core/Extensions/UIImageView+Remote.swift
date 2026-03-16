@@ -97,7 +97,10 @@ public extension UIImageView {
             kCGImageSourceThumbnailMaxPixelSize: maxPixelDimension
         ] as CFDictionary
         
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions) else { return nil }
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions) else {
+            // Fallback: direct UIImage creation (works for WebP and other formats where thumbnail creation fails)
+            return UIImage(data: data)
+        }
         return UIImage(cgImage: cgImage)
     }
 }
