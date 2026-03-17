@@ -78,6 +78,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         window.rootViewController = launchVC
         window.makeKeyAndVisible()
+        
+        #if DEBUG
+        LifecycleDebugTrigger.enable(on: window)
+        #endif
     }
     
     func sceneDidDisconnect(_ scene: UIScene) {
