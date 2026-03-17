@@ -28,6 +28,7 @@ public protocol ConstruktRouter: AnyObject {
     func present(_ module: ConstruktPresentable, style: ModalStyle, animated: Bool, completion: (() -> Void)?, receiver: AnyRouteReceiving?)
     func dismiss(animated: Bool, completion: (() -> Void)?)
     func showToast(_ module: ConstruktPresentable, config: ToastConfiguration)
+    func replaceStack(with modules: [ConstruktPresentable], completion: (() -> Void)?, receiver: AnyRouteReceiving?, animated: Bool)
 }
 
 public extension ConstruktRouter {
@@ -57,6 +58,10 @@ public extension ConstruktRouter {
     
     func showToast(_ module: ConstruktPresentable, config: ToastConfiguration = .bottom()) {
         showToast(module, config: config)
+    }
+    
+    func replaceStack(with modules: [ConstruktPresentable], completion: (() -> Void)? = nil, receiver: AnyRouteReceiving? = nil, animated: Bool = true) {
+        replaceStack(with: modules, completion: completion, receiver: receiver, animated: animated)
     }
 }
 
@@ -146,6 +151,26 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
         let vc = module.toPresentable()
         guard let window = topMostWindow() else { return }
         ToastManager.shared.show(content: vc, config: config, in: window)
+    }
+    
+    public func replaceStack(with modules: [ConstruktPresentable], completion: (() -> Void)? = nil, receiver: AnyRouteReceiving? = nil, animated: Bool = true) {
+        var newStack: [UIViewController] = []
+        
+        if let existingRoot = navigationController.viewControllers.first {
+            newStack.append(existingRoot)
+        }
+        
+        for module in modules {
+            let vc = module.toPresentable()
+            vc.associatedCoordinator = receiver
+            newStack.append(vc)
+        }
+        
+        if let completion = completion, let topVC = newStack.last {
+            completions[topVC] = completion
+        }
+        
+        navigationController.setViewControllers(newStack, animated: animated)
     }
     
     // MARK: - UINavigationControllerDelegate
