@@ -123,7 +123,7 @@ final class AppRouteHandler: ConstruktRouteHandler<AppRoute> {
                         return true
                     }
                 })
-                .toPresentable()
+                .toPresentable(trackingLabel: "MovieDetailView")
             
         case .movieList(let title, let sectionTypeRaw, let genreId, let genreName, let allGenres):
             let sectionType = HomeSection(rawValue: sectionTypeRaw) ?? .categories
