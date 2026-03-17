@@ -63,7 +63,7 @@ struct MovieDetailView: ViewConvertable {
                             heightConstraint
                         ])
                     }
-                    .onReceive(scrollBinding.$offset) { [handles] context in
+                    .onReceive(scrollBinding.$offset) { context in
                          let yOffset = context.value
                          guard let constraint = handles.heroHeightConstraint else { return }
                          if yOffset < 0 {
@@ -104,7 +104,7 @@ struct MovieDetailView: ViewConvertable {
                             SpacerView(h: 40)
                         }
                     }
-                    .onDidScroll { [scrollBinding] context in
+                    .onDidScroll { context in
                         scrollBinding.offset = context.view.contentOffset.y
                     }
                     .with { [handles] scrollView in
@@ -186,9 +186,9 @@ struct MovieDetailView: ViewConvertable {
                 description: "View the movie's title, rating, release year, and genres.",
                 tooltipPosition: .below,
                 spotlightPadding: 0,
-                prepare: { [weak scrollView] in
+                prepare: { [scrollView] in
                     await MainActor.run {
-                        scrollView?.setContentOffset(.zero, animated: true)
+                        scrollView.setContentOffset(.zero, animated: true)
                     }
                 }
             ),
