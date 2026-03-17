@@ -23,7 +23,7 @@ final class ScreenFactory: ScreenFactoryProtocol {
             return ProfileView().toPresentable()
         case .movieDetail(let id):
             let movie = Movie(id: id)
-            return MovieDetailView(movie: movie).toPresentable()
+            return MovieDetailView(movie: movie).toPresentable(trackingLabel: "Movie Detail")
             
         case .movieList(let title, let sectionTypeRaw, let genreId, let genreName, let allGenres):
             let sectionType = HomeSection(rawValue: sectionTypeRaw) ?? .categories

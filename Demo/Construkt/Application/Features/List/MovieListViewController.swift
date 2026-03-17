@@ -132,7 +132,7 @@ class MovieListViewController: UIViewController {
     
     private func showDetail(for movie: Movie) {
         let detailVC = MovieDetailView(movie: movie)
-            .toPresentable()
+            .toPresentable(trackingLabel: "MovieDetailView(from:MovieList)")
         navigationController?.pushViewController(detailVC, animated: true)
     }
     
