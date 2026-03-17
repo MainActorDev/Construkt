@@ -12,6 +12,8 @@
 		04F53D642F5F3CF500B6B205 /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 04F53D632F5F3CF500B6B205 /* ConstruktKit */; };
 		9511898C2F57B46500AB3D49 /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9511898B2F57B46500AB3D49 /* ConstruktKit */; };
 		95118AD62F57C18200AB3D49 /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 95118AD52F57C18200AB3D49 /* ConstruktKit */; };
+		951F15152F6912D300D7B430 /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 951F15142F6912D300D7B430 /* ConstruktKit */; };
+		951F17192F6914D500D7B430 /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 951F17182F6914D500D7B430 /* ConstruktKit */; };
 		9576D4922F561536006F7C7F /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9576D4912F561536006F7C7F /* ConstruktKit */; };
 		9576D4982F561D00006F7C7F /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9576D4972F561D00006F7C7F /* ConstruktKit */; };
 		9576D5412F56713B006F7C7F /* ConstruktKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9576D5402F56713B006F7C7F /* ConstruktKit */; };
@@ -50,11 +52,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				04F53D642F5F3CF500B6B205 /* ConstruktKit in Frameworks */,
+				951F17192F6914D500D7B430 /* ConstruktKit in Frameworks */,
 				04CA18FD2F5F3A87004E7482 /* ConstruktKit in Frameworks */,
 				95118AD62F57C18200AB3D49 /* ConstruktKit in Frameworks */,
 				9511898C2F57B46500AB3D49 /* ConstruktKit in Frameworks */,
 				9576D5412F56713B006F7C7F /* ConstruktKit in Frameworks */,
 				9576D4982F561D00006F7C7F /* ConstruktKit in Frameworks */,
+				951F15152F6912D300D7B430 /* ConstruktKit in Frameworks */,
 				95D8330B2F56F339000154B8 /* ConstruktKit in Frameworks */,
 				95D833B32F571556000154B8 /* ConstruktKit in Frameworks */,
 				9576D4922F561536006F7C7F /* ConstruktKit in Frameworks */,
@@ -111,6 +115,8 @@
 				95118AD52F57C18200AB3D49 /* ConstruktKit */,
 				04CA18FC2F5F3A87004E7482 /* ConstruktKit */,
 				04F53D632F5F3CF500B6B205 /* ConstruktKit */,
+				951F15142F6912D300D7B430 /* ConstruktKit */,
+				951F17182F6914D500D7B430 /* ConstruktKit */,
 			);
 			productName = Construkt;
 			productReference = 95DB7F4C2EB70976003FE2F7 /* Construkt.app */;
@@ -141,7 +147,7 @@
 			mainGroup = 95DB7F432EB70976003FE2F7;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				04F53D622F5F3CF500B6B205 /* XCLocalSwiftPackageReference "../../Construkt" */,
+				951F17172F6914D500D7B430 /* XCRemoteSwiftPackageReference "Construkt" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 95DB7F4D2EB70976003FE2F7 /* Products */;
@@ -376,12 +382,16 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		04F53D622F5F3CF500B6B205 /* XCLocalSwiftPackageReference "../../Construkt" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../Construkt;
+/* Begin XCRemoteSwiftPackageReference section */
+		951F17172F6914D500D7B430 /* XCRemoteSwiftPackageReference "Construkt" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/MainActorDev/Construkt";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.8;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		042A397D2F4C4FA3001DC0CA /* ConstruktKit */ = {
@@ -402,6 +412,15 @@
 		};
 		95118AD52F57C18200AB3D49 /* ConstruktKit */ = {
 			isa = XCSwiftPackageProductDependency;
+			productName = ConstruktKit;
+		};
+		951F15142F6912D300D7B430 /* ConstruktKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ConstruktKit;
+		};
+		951F17182F6914D500D7B430 /* ConstruktKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 951F17172F6914D500D7B430 /* XCRemoteSwiftPackageReference "Construkt" */;
 			productName = ConstruktKit;
 		};
 		9576D4912F561536006F7C7F /* ConstruktKit */ = {

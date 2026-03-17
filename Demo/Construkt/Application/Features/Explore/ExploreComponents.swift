@@ -68,7 +68,7 @@ struct ExploreCollectionCard: ViewBuilder {
     
     var body: View {
         ZStackView {
-            ImageView(url: URL(string: collection.imageURL)!)
+            ImageView(url: URL(string: collection.imageURL))
                 .contentMode(.scaleAspectFill)
                 .clipsToBounds(true)
                 .alpha(0.7)
