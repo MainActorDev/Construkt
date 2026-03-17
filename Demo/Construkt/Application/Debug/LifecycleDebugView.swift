@@ -32,324 +32,253 @@ final class LifecycleDebugViewController: UIViewController {
     private func setupUI() {
         let scrollContent = buildContent()
         
-        let scrollView = UIScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(scrollContent)
+        let scrollView = VerticalScrollView(scrollContent)
+            .build()
         
         view.addSubview(scrollView)
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollContent.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            scrollContent.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            scrollContent.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            scrollContent.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            scrollContent.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
         
-        contentView = scrollContent
+        contentView = scrollView
     }
     
     private func buildContent() -> UIView {
-        let header = buildHeader()
-        let activeSection = buildActiveSection()
-        let inactiveSection = buildInactiveSection()
-        let actionBar = buildActionBar()
-        
-        let stack = UIStackView(arrangedSubviews: [header, activeSection, inactiveSection, actionBar])
-        stack.axis = .vertical
-        stack.spacing = 16
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.isLayoutMarginsRelativeArrangement = true
-        stack.layoutMargins = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
-        
-        return stack
+        VStackView(spacing: 16) {
+            buildHeader()
+            buildActiveSection()
+            buildInactiveSection()
+            buildActionBar()
+        }
+        .padding(16)
+        .build()
     }
     
     private func buildHeader() -> UIView {
-        let titleLabel = UILabel()
-        titleLabel.text = "Lifecycle Debug"
-        titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
-        titleLabel.textColor = .white
-        
-        let icon = UIImageView(image: UIImage(systemName: "wrench.and.screwdriver"))
-        icon.tintColor = .white
-        icon.contentMode = .scaleAspectFit
-        
-        let refreshButton = UIButton(type: .system)
-        refreshButton.setTitle("Refresh", for: .normal)
-        refreshButton.setTitleColor(.white, for: .normal)
-        refreshButton.addTarget(self, action: #selector(refreshData), for: .touchUpInside)
-        
-        let doneButton = UIButton(type: .system)
-        doneButton.setTitle("Done", for: .normal)
-        doneButton.setTitleColor(.systemBlue, for: .normal)
-        doneButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
-        doneButton.addTarget(self, action: #selector(dismissTapped), for: .touchUpInside)
-        
-        let stack = UIStackView(arrangedSubviews: [icon, titleLabel, UIView(), refreshButton, doneButton])
-        stack.axis = .horizontal
-        stack.spacing = 12
-        stack.alignment = .center
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        
-        let container = UIView()
-        container.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
-        container.addSubview(stack)
-        stack.pinToSuperviewEdges(insets: .init(top: 12, left: 16, bottom: 12, right: 16))
-        
-        return container
+        HStackView(spacing: 12) {
+            ImageView(systemName: "wrench.and.screwdriver")
+                .tintColor(.white)
+                .size(width: 24, height: 24)
+            
+            LabelView("Lifecycle Debug")
+                .font(.systemFont(ofSize: 20, weight: .bold))
+                .color(.white)
+            
+            SpacerView()
+            
+            ButtonView("Refresh") { [weak self] _ in
+                self?.refreshData()
+            }
+            .font(.systemFont(ofSize: 14))
+            .color(.white)
+            
+            ButtonView("Done") { [weak self] _ in
+                self?.dismiss(animated: true)
+            }
+            .font(.systemFont(ofSize: 16, weight: .semibold))
+            .color(.systemBlue)
+        }
+        .padding(h: 16, v: 12)
+        .backgroundColor(UIColor(white: 0.15, alpha: 1.0))
+        .build()
     }
     
     private func buildActiveSection() -> UIView {
-        let indicator = UIView()
-        indicator.backgroundColor = .systemGreen
-        indicator.layer.cornerRadius = 4
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([indicator.widthAnchor.constraint(equalToConstant: 8), indicator.heightAnchor.constraint(equalToConstant: 8)])
+        let headerStack = HStackView(spacing: 8) {
+            ContainerView()
+                .backgroundColor(.systemGreen)
+                .cornerRadius(4)
+                .size(width: 8, height: 8)
+            
+            LabelView("ACTIVE (\(activeItems.count))")
+                .font(.systemFont(ofSize: 14, weight: .semibold))
+                .color(.systemGreen)
+        }
         
-        let title = UILabel()
-        title.text = "ACTIVE (\(activeItems.count))"
-        title.font = .systemFont(ofSize: 14, weight: .semibold)
-        title.textColor = .systemGreen
-        
-        let headerStack = UIStackView(arrangedSubviews: [indicator, title])
-        headerStack.axis = .horizontal
-        headerStack.spacing = 8
-        
-        var items: [UIView] = [headerStack]
+        var items: [ViewConvertable] = [headerStack]
         
         if activeItems.isEmpty {
-            items.append(buildEmptyState(icon: "checkmark.circle", message: "No active controllers"))
+            items.append(buildEmptyStateConvertible(icon: "checkmark.circle", message: "No active controllers"))
         } else {
             for item in activeItems.sorted(by: { $0.age > $1.age }) {
-                items.append(buildActiveItemRow(item))
+                items.append(buildActiveItemRowConvertible(item))
             }
         }
         
-        let stack = UIStackView(arrangedSubviews: items)
-        stack.axis = .vertical
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        
-        let container = UIView()
-        container.backgroundColor = UIColor(white: 0.12, alpha: 1.0)
-        container.layer.cornerRadius = 12
-        container.addSubview(stack)
-        stack.pinToSuperviewEdges(insets: .init(top: 12, left: 12, bottom: 12, right: 12))
-        
-        return container
+        return VStackView(items)
+            .spacing(8)
+            .padding(12)
+            .backgroundColor(UIColor(white: 0.12, alpha: 1.0))
+            .cornerRadius(12)
+            .build()
     }
     
     private func buildActiveItemRow(_ item: ActiveControllerInfo) -> UIView {
+        return buildActiveItemRowConvertible(item).asViews().first!.build()
+    }
+    
+    private func buildActiveItemRowConvertible(_ item: ActiveControllerInfo) -> ViewConvertable {
         let severity = severityInfo(for: item)
         
-        let icon = UIImageView(image: UIImage(systemName: severity.icon))
-        icon.tintColor = severity.color
-        icon.contentMode = .scaleAspectFit
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([icon.widthAnchor.constraint(equalToConstant: 16), icon.heightAnchor.constraint(equalToConstant: 16)])
-        
-        let nameLabel = UILabel()
-        nameLabel.text = item.label ?? "Unnamed"
-        nameLabel.font = .systemFont(ofSize: 15, weight: .medium)
-        nameLabel.textColor = .white
-        
-        let sourceLabel = UILabel()
-        sourceLabel.text = "\(item.sourceFile):\(item.sourceLine)"
-        sourceLabel.font = .systemFont(ofSize: 12)
-        sourceLabel.textColor = .gray
-        
-        let labelStack = UIStackView(arrangedSubviews: [nameLabel, sourceLabel])
-        labelStack.axis = .vertical
-        labelStack.spacing = 2
-        
-        let ageLabel = UILabel()
-        ageLabel.text = formattedAge(item.age)
-        ageLabel.font = .systemFont(ofSize: 14, weight: .medium)
-        ageLabel.textColor = severity.color
-        
-        let traceButton = UIButton(type: .system)
-        traceButton.setTitle("Trace", for: .normal)
-        traceButton.setTitleColor(.systemBlue, for: .normal)
-        traceButton.titleLabel?.font = .systemFont(ofSize: 12)
-        traceButton.tag = activeItems.firstIndex(where: { $0.id == item.id }) ?? 0
-        traceButton.addTarget(self, action: #selector(showTrace(_:)), for: .touchUpInside)
-        
-        let stack = UIStackView(arrangedSubviews: [icon, labelStack, UIView(), ageLabel, traceButton])
-        stack.axis = .horizontal
-        stack.spacing = 12
-        stack.alignment = .center
-        
-        let container = UIView()
-        container.addSubview(stack)
-        stack.pinToSuperviewEdges(insets: .init(top: 8, left: 0, bottom: 8, right: 0))
-        
-        return container
+        return HStackView(spacing: 12) {
+            ImageView(systemName: severity.icon)
+                .tintColor(severity.color)
+                .size(width: 16, height: 16)
+            
+            VStackView(spacing: 2) {
+                LabelView(item.label ?? "Unnamed")
+                    .font(.systemFont(ofSize: 15, weight: .medium))
+                    .color(.white)
+                
+                LabelView("\(item.sourceFile):\(item.sourceLine)")
+                    .font(.systemFont(ofSize: 12))
+                    .color(.gray)
+            }
+            
+            SpacerView()
+            
+            LabelView(formattedAge(item.age))
+                .font(.systemFont(ofSize: 14, weight: .medium))
+                .color(severity.color)
+            
+            ButtonView("Trace") { [weak self] _ in
+                self?.showTrace(for: item)
+            }
+            .font(.systemFont(ofSize: 12))
+            .color(.systemBlue)
+        }
+        .padding(h: 0, v: 8)
     }
     
     private func buildInactiveSection() -> UIView {
-        let indicator = UIView()
-        indicator.backgroundColor = .gray
-        indicator.layer.cornerRadius = 4
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([indicator.widthAnchor.constraint(equalToConstant: 8), indicator.heightAnchor.constraint(equalToConstant: 8)])
+        let headerStack = HStackView(spacing: 8) {
+            ContainerView()
+                .backgroundColor(.gray)
+                .cornerRadius(4)
+                .size(width: 8, height: 8)
+            
+            LabelView("INACTIVE (\(inactiveItems.count))")
+                .font(.systemFont(ofSize: 14, weight: .semibold))
+                .color(.gray)
+        }
         
-        let title = UILabel()
-        title.text = "INACTIVE (\(inactiveItems.count))"
-        title.font = .systemFont(ofSize: 14, weight: .semibold)
-        title.textColor = .gray
-        
-        let headerStack = UIStackView(arrangedSubviews: [indicator, title])
-        headerStack.axis = .horizontal
-        headerStack.spacing = 8
-        
-        var items: [UIView] = [headerStack]
+        var items: [ViewConvertable] = [headerStack]
         
         if inactiveItems.isEmpty {
-            items.append(buildEmptyState(icon: "archivebox", message: "No deallocated controllers"))
+            items.append(buildEmptyStateConvertible(icon: "archivebox", message: "No deallocated controllers"))
         } else {
             for item in inactiveItems.sorted(by: { $0.deallocatedAt > $1.deallocatedAt }) {
-                items.append(buildInactiveItemRow(item))
+                items.append(buildInactiveItemRowConvertible(item))
             }
         }
         
-        let stack = UIStackView(arrangedSubviews: items)
-        stack.axis = .vertical
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        
-        let container = UIView()
-        container.backgroundColor = UIColor(white: 0.12, alpha: 1.0)
-        container.layer.cornerRadius = 12
-        container.addSubview(stack)
-        stack.pinToSuperviewEdges(insets: .init(top: 12, left: 12, bottom: 12, right: 12))
-        
-        return container
+        return VStackView(items)
+            .spacing(8)
+            .padding(12)
+            .backgroundColor(UIColor(white: 0.12, alpha: 1.0))
+            .cornerRadius(12)
+            .build()
     }
     
     private func buildInactiveItemRow(_ item: DeallocatedControllerInfo) -> UIView {
-        let icon = UIImageView(image: UIImage(systemName: "checkmark.circle"))
-        icon.tintColor = .systemGreen
-        icon.contentMode = .scaleAspectFit
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([icon.widthAnchor.constraint(equalToConstant: 16), icon.heightAnchor.constraint(equalToConstant: 16)])
+        return buildInactiveItemRowConvertible(item).asViews().first!.build()
+    }
+    
+    private func buildInactiveItemRowConvertible(_ item: DeallocatedControllerInfo) -> ViewConvertable {
+        let cvIconName = item.contentViewDeallocated ? "checkmark.circle" : "exclamationmark.triangle"
+        let cvColor: UIColor = item.contentViewDeallocated ? .systemGreen : .systemOrange
         
-        let nameLabel = UILabel()
-        nameLabel.text = item.label ?? "Unnamed"
-        nameLabel.font = .systemFont(ofSize: 15, weight: .medium)
-        nameLabel.textColor = .white
+        let regIconName = item.registryDeallocated ? "checkmark.circle" : "exclamationmark.triangle"
+        let regColor: UIColor = item.registryDeallocated ? .systemGreen : .systemOrange
         
-        let lifetimeLabel = UILabel()
-        lifetimeLabel.text = "Lived: \(formattedLifetime(item.lifetime))"
-        lifetimeLabel.font = .systemFont(ofSize: 12)
-        lifetimeLabel.textColor = .gray
-        
-        let labelStack = UIStackView(arrangedSubviews: [nameLabel, lifetimeLabel])
-        labelStack.axis = .vertical
-        labelStack.spacing = 2
-        
-        let cvIcon = UIImageView(image: UIImage(systemName: item.contentViewDeallocated ? "checkmark.circle" : "exclamationmark.triangle"))
-        cvIcon.tintColor = item.contentViewDeallocated ? .systemGreen : .systemOrange
-        cvIcon.contentMode = .scaleAspectFit
-        cvIcon.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([cvIcon.widthAnchor.constraint(equalToConstant: 12), cvIcon.heightAnchor.constraint(equalToConstant: 12)])
-        
-        let cvLabel = UILabel()
-        cvLabel.text = "CV"
-        cvLabel.font = .systemFont(ofSize: 10)
-        cvLabel.textColor = .gray
-        
-        let regIcon = UIImageView(image: UIImage(systemName: item.registryDeallocated ? "checkmark.circle" : "exclamationmark.triangle"))
-        regIcon.tintColor = item.registryDeallocated ? .systemGreen : .systemOrange
-        regIcon.contentMode = .scaleAspectFit
-        regIcon.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([regIcon.widthAnchor.constraint(equalToConstant: 12), regIcon.heightAnchor.constraint(equalToConstant: 12)])
-        
-        let regLabel = UILabel()
-        regLabel.text = "Reg"
-        regLabel.font = .systemFont(ofSize: 10)
-        regLabel.textColor = .gray
-        
-        let cvStack = UIStackView(arrangedSubviews: [cvIcon, cvLabel])
-        cvStack.axis = .horizontal
-        cvStack.spacing = 2
-        
-        let regStack = UIStackView(arrangedSubviews: [regIcon, regLabel])
-        regStack.axis = .horizontal
-        regStack.spacing = 2
-        
-        let depsStack = UIStackView(arrangedSubviews: [cvStack, regStack])
-        depsStack.axis = .horizontal
-        depsStack.spacing = 8
-        
-        let stack = UIStackView(arrangedSubviews: [icon, labelStack, UIView(), depsStack])
-        stack.axis = .horizontal
-        stack.spacing = 12
-        stack.alignment = .center
-        
-        let container = UIView()
-        container.addSubview(stack)
-        stack.pinToSuperviewEdges(insets: .init(top: 8, left: 0, bottom: 8, right: 0))
-        
-        return container
+        return HStackView(spacing: 12) {
+            ImageView(systemName: "checkmark.circle")
+                .tintColor(.systemGreen)
+                .size(width: 16, height: 16)
+            
+            VStackView(spacing: 2) {
+                LabelView(item.label ?? "Unnamed")
+                    .font(.systemFont(ofSize: 15, weight: .medium))
+                    .color(.white)
+                
+                LabelView("Lived: \(formattedLifetime(item.lifetime))")
+                    .font(.systemFont(ofSize: 12))
+                    .color(.gray)
+            }
+            
+            SpacerView()
+            
+            HStackView(spacing: 8) {
+                HStackView(spacing: 2) {
+                    ImageView(systemName: cvIconName)
+                        .tintColor(cvColor)
+                        .size(width: 12, height: 12)
+                    LabelView("CV")
+                        .font(.systemFont(ofSize: 10))
+                        .color(.gray)
+                }
+                
+                HStackView(spacing: 2) {
+                    ImageView(systemName: regIconName)
+                        .tintColor(regColor)
+                        .size(width: 12, height: 12)
+                    LabelView("Reg")
+                        .font(.systemFont(ofSize: 10))
+                        .color(.gray)
+                }
+            }
+        }
+        .padding(h: 0, v: 8)
     }
     
     private func buildEmptyState(icon: String, message: String) -> UIView {
-        let iconView = UIImageView(image: UIImage(systemName: icon))
-        iconView.tintColor = .gray
-        iconView.contentMode = .scaleAspectFit
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([iconView.widthAnchor.constraint(equalToConstant: 32), iconView.heightAnchor.constraint(equalToConstant: 32)])
-        
-        let label = UILabel()
-        label.text = message
-        label.font = .systemFont(ofSize: 14)
-        label.textColor = .gray
-        
-        let stack = UIStackView(arrangedSubviews: [iconView, label])
-        stack.axis = .vertical
-        stack.spacing = 8
-        stack.alignment = .center
-        
-        let container = UIView()
-        container.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 24),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -24)
-        ])
-        
-        return container
+        return buildEmptyStateConvertible(icon: icon, message: message).asViews().first!.build()
+    }
+    
+    private func buildEmptyStateConvertible(icon: String, message: String) -> ViewConvertable {
+        VStackView(spacing: 8) {
+            ImageView(systemName: icon)
+                .tintColor(.gray)
+                .size(width: 32, height: 32)
+            
+            LabelView(message)
+                .font(.systemFont(ofSize: 14))
+                .color(.gray)
+        }
+        .padding(h: 0, v: 24)
     }
     
     private func buildActionBar() -> UIView {
-        let forceCheckButton = buildActionButton(title: "Force Check", color: .systemOrange, action: #selector(forceCheck))
-        let exportButton = buildActionButton(title: "Export", color: .systemBlue, action: #selector(exportData))
-        let clearButton = buildActionButton(title: "Clear", color: .systemRed, action: #selector(clearHistory))
-        
-        let stack = UIStackView(arrangedSubviews: [forceCheckButton, exportButton, clearButton])
-        stack.axis = .horizontal
-        stack.spacing = 12
-        stack.distribution = .fillEqually
-        
-        return stack
+        HStackView(spacing: 12) {
+            buildActionButton(title: "Force Check", color: .systemOrange) { [weak self] in
+                self?.forceCheck()
+            }
+            
+            buildActionButton(title: "Export", color: .systemBlue) { [weak self] in
+                self?.exportData()
+            }
+            
+            buildActionButton(title: "Clear", color: .systemRed) { [weak self] in
+                self?.clearHistory()
+            }
+        }
+        .distribution(.fillEqually)
+        .build()
     }
     
-    private func buildActionButton(title: String, color: UIColor, action: Selector) -> UIButton {
-        let button = UIButton(type: .system)
-        button.setTitle(title, for: .normal)
-        button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
-        button.backgroundColor = color
-        button.layer.cornerRadius = 8
-        button.addTarget(self, action: action, for: .touchUpInside)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([button.heightAnchor.constraint(equalToConstant: 44)])
-        return button
+    private func buildActionButton(title: String, color: UIColor, action: @escaping () -> Void) -> UIView {
+        ButtonView(title) { _ in
+            action()
+        }
+        .font(.systemFont(ofSize: 14, weight: .medium))
+        .color(.white)
+        .backgroundColor(color)
+        .cornerRadius(8)
+        .height(44)
+        .build()
     }
     
     private func severityInfo(for item: ActiveControllerInfo) -> (icon: String, color: UIColor) {
@@ -376,31 +305,24 @@ final class LifecycleDebugViewController: UIViewController {
         return "\(seconds / 60)m \(seconds % 60)s"
     }
     
-    @objc private func refreshData() {
+    private func refreshData() {
         activeItems = LifecycleHostTracker.shared.activeControllerInfos
         inactiveItems = LifecycleHostTracker.shared.inactiveControllerInfos
         
         let newContent = buildContent()
         contentView?.removeFromSuperview()
-        view.addSubview(newContent)
-        newContent.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            newContent.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            newContent.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            newContent.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
-        contentView = newContent
-    }
-    
-    @objc private func dismissTapped() {
-        dismiss(animated: true)
-    }
-    
-    @objc private func showTrace(_ sender: UIButton) {
-        let index = sender.tag
-        guard index < activeItems.count else { return }
-        let item = activeItems[index]
         
+        let scrollView = VerticalScrollView(newContent).build()
+        view.addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+        contentView = scrollView
+    }
+    
+    private func showTrace(for item: ActiveControllerInfo) {
         let stackTrace = item.stackTrace.prefix(10).joined(separator: "\n")
         let alert = UIAlertController(title: item.label ?? "Stack Trace", message: stackTrace, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Copy", style: .default, handler: { _ in
@@ -410,7 +332,7 @@ final class LifecycleDebugViewController: UIViewController {
         present(alert, animated: true)
     }
     
-    @objc private func forceCheck() {
+    private func forceCheck() {
         let warnings = LifecycleHostTracker.shared.checkForLeaks()
         refreshData()
         
@@ -418,13 +340,13 @@ final class LifecycleDebugViewController: UIViewController {
         showAlert(title: "Check Complete", message: message)
     }
     
-    @objc private func exportData() {
+    private func exportData() {
         let data = LifecycleDebugExport.generate()
         LifecycleDebugExport.copyToClipboard(data)
         showAlert(title: "Exported", message: "Copied \(data.active.count) active, \(data.inactive.count) inactive to clipboard")
     }
     
-    @objc private func clearHistory() {
+    private func clearHistory() {
         LifecycleHostTracker.shared.clearHistory()
         refreshData()
         showAlert(title: "Cleared", message: "History cleared")
@@ -434,18 +356,5 @@ final class LifecycleDebugViewController: UIViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
-    }
-}
-
-private extension UIView {
-    func pinToSuperviewEdges(insets: UIEdgeInsets = .zero) {
-        guard let superview = superview else { return }
-        translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            topAnchor.constraint(equalTo: superview.topAnchor, constant: insets.top),
-            bottomAnchor.constraint(equalTo: superview.bottomAnchor, constant: -insets.bottom),
-            leadingAnchor.constraint(equalTo: superview.leadingAnchor, constant: insets.left),
-            trailingAnchor.constraint(equalTo: superview.trailingAnchor, constant: -insets.right)
-        ])
     }
 }
