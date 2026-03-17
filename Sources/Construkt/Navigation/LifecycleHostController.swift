@@ -51,18 +51,61 @@ extension ModifiableView {
 /// The actual View Controller that catches genuine UIKit lifecycles and forwards them to the declarative View
 open class LifecycleHostController: UIViewController {
     private let contentView: UIView
+    private weak var trackedContentView: UIView?
+    private weak var trackedRegistry: ViewLifecycleRegistry?
+    internal var trackingId: UUID?
+    internal var hadParent: Bool = false
+    private var trackingLabel: String?
     
-    public init(contentView: UIView) {
-        self.contentView = contentView
-        super.init(nibName: nil, bundle: nil)
+    public convenience init(contentView: UIView, trackingLabel: String? = nil) {
+        self.init(contentView: contentView, trackingLabel: trackingLabel, file: #file, line: #line)
     }
     
-    required public init?(coder: NSCoder) {
+    internal init(contentView: UIView, trackingLabel: String?, file: String, line: Int) {
+        self.contentView = contentView
+        self.trackingLabel = trackingLabel
+        
+        super.init(nibName: nil, bundle: nil)
+        
+        guard let trackingLabel = trackingLabel else { return }
+        
+        let registry = objc_getAssociatedObject(contentView, &AssociatedKeys.lifecycleKey) as? ViewLifecycleRegistry
+        LifecycleHostTracker.shared.register(
+            self,
+            label: trackingLabel,
+            contentView: contentView,
+            registry: registry,
+            file: file,
+            line: line
+        )
+        
+        if LifecycleHostTracker.shared.configuration.isEnabled {
+            trackedContentView = contentView
+            trackedRegistry = registry
+        }
+    }
+    
+    public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
     deinit {
-        print("[CONSTRUKT 🔨] LifecycleHostController deinit")
+        print("[BEKA] deallocated")
+        if LifecycleHostTracker.shared.configuration.isEnabled, trackingId != nil {
+            LifecycleHostTracker.shared.reportDealloc(self)
+        }
+    }
+    
+    public override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        
+        if parent != nil {
+            hadParent = true
+        }
+        
+        if parent == nil && hadParent && trackingId != nil {
+            LifecycleHostTracker.shared.scheduleImmediateCheck(after: 2.0)
+        }
     }
 
     public override func viewDidLoad() {
@@ -97,9 +140,15 @@ open class LifecycleHostController: UIViewController {
 /// Allows ANY pure Construkt declarative View struct to be pushed directly onto a Navigation stack.
 extension ViewConvertable {
     /// Packages the declarative view into a `LifecycleHostController`, returning it as a UIViewController.
-    public func toPresentable(title: String? = nil) -> UIViewController {
-        // Because `asViews()` generates the UIView instances that have the modifiers attached,
-        // the returned `contentView` holds the associated lifecycle registry.
+    /// - Parameters:
+    ///   - title: The title for the view controller.
+    ///   - trackingLabel: Optional label for memory leak tracking. If nil, memory tracking is disabled for this instance.
+    /// - Returns: A UIViewController ready for presentation.
+    public func toPresentable(title: String? = nil, trackingLabel: String? = nil) -> UIViewController {
+        toPresentable(title: title, trackingLabel: trackingLabel, file: #file, line: #line)
+    }
+    
+    internal func toPresentable(title: String?, trackingLabel: String?, file: String, line: Int) -> UIViewController {
         let views = self.asViews()
         let view: UIView
         if views.count == 1 {
@@ -118,7 +167,7 @@ extension ViewConvertable {
                 ])
             }
         }
-        let host = LifecycleHostController(contentView: view)
+        let host = LifecycleHostController(contentView: view, trackingLabel: trackingLabel, file: file, line: line)
         host.title = title
         return host
     }
