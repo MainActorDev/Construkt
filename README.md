@@ -19,6 +19,7 @@
   - [Core Runtime Types](#core-runtime-types)
   - [Runtime Data Flow](#runtime-data-flow)
   - [Defining a FeatureSpec](#defining-a-featurespec)
+  - [FeatureSpec Quick Start (What Each Type Means)](#featurespec-quick-start-what-each-type-means)
   - [Effect Policies & Concurrency Semantics](#effect-policies--concurrency-semantics)
   - [Stale Effects and Error Mapping](#stale-effects-and-error-mapping)
   - [FeatureStore API for UI Integration](#featurestore-api-for-ui-integration)
@@ -330,6 +331,76 @@ struct CounterFeature: FeatureSpec {
 
     static func policy(for effect: Effect) -> EffectPolicy {
         .dropIfRunning("counter-save")
+    }
+}
+```
+
+### FeatureSpec Quick Start (What Each Type Means)
+
+When implementing `FeatureSpec`, define each type with this mental model:
+
+| Type | What it is | Typical content |
+|------|------------|-----------------|
+| `State` | Persistent feature state | form values, loading flags, validation status, fetched models |
+| `Intent` | Input events into reducer | user actions, lifecycle triggers, effect completion intents |
+| `Effect` | Async work descriptors | API calls, storage writes, SDK operations |
+| `Output` | One-off external events | navigation events, toast/snackbar events |
+| `Dependencies` | Runtime dependency bag for effects | services, repositories, token providers, clock/device providers |
+
+Reducer/runtime hooks:
+
+- `initialState`: the first state when runtime boots.
+- `reduce(state:intent:)`: pure synchronous transition that may schedule effects/outputs.
+- `policy(for:)`: how each effect is scheduled (`latest`, `queue`, `dropIfRunning`, etc).
+- `staleStrategy(for:)`: whether old async feedback is accepted (`.accept`) or dropped (`.drop`).
+- `mapEffectError(_:effect:)`: optional typed recovery path from effect failures back into reducer intents.
+
+Minimal implementation template:
+
+```swift
+struct ExampleFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var isLoading = false
+        var message: String?
+    }
+
+    enum Intent: Sendable {
+        case load
+        case loaded(String)
+        case failed(String)
+    }
+
+    enum Effect: Sendable, Hashable {
+        case fetchMessage
+    }
+
+    enum Output: Sendable {
+        case toast(String)
+    }
+
+    struct Dependencies: Sendable {
+        let fetch: @Sendable () async throws -> String
+    }
+
+    static var initialState: State { .init() }
+
+    static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+        switch intent {
+        case .load:
+            state.isLoading = true
+            return .init(effects: [.fetchMessage])
+        case .loaded(let value):
+            state.isLoading = false
+            state.message = value
+            return .none
+        case .failed(let message):
+            state.isLoading = false
+            return .init(outputs: [.toast(message)])
+        }
+    }
+
+    static func policy(for effect: Effect) -> EffectPolicy {
+        .dropIfRunning("example-load")
     }
 }
 ```
