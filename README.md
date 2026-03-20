@@ -15,6 +15,16 @@
   - [Native Operators](#native-operators)
   - [Combine & RxSwift Integration](#combine--rxswift-integration)
   - [Included UI Components](#included-ui-components)
+- [Feature Runtime (Deterministic State Machine)](#feature-runtime-deterministic-state-machine)
+  - [Core Runtime Types](#core-runtime-types)
+  - [Runtime Data Flow](#runtime-data-flow)
+  - [Defining a FeatureSpec](#defining-a-featurespec)
+  - [Effect Policies & Concurrency Semantics](#effect-policies--concurrency-semantics)
+  - [Stale Effects and Error Mapping](#stale-effects-and-error-mapping)
+  - [FeatureStore API for UI Integration](#featurestore-api-for-ui-integration)
+  - [Runtime Scope and Lifecycle](#runtime-scope-and-lifecycle)
+  - [Runtime Journal for Debugging](#runtime-journal-for-debugging)
+  - [Testing Runtime Features](#testing-runtime-features)
 - [Modern Collection and Table Views](#modern-collection-and-table-views)
   - [Table Views](#table-views)
   - [Dynamic Collection Views](#dynamic-collection-views)
@@ -229,6 +239,191 @@ Construkt provides declarative wrappers for most standard UIKit components:
 - **Text & Controls:** `LabelView`, `ButtonView`, `TextField`, `TextEditor`, `Toggle`, `Slider`, `Stepper`
 - **Layout & Spacing:** `VStackView`, `HStackView`, `ZStackView`, `Screen`, `SpacerView`, `DividerView`
 - **Visual & Indicators:** `ImageView`, `BlurView`, `LinearGradient`, `ProgressView`, `ActivityIndicator`, `CircleView`
+
+---
+
+## Feature Runtime (Deterministic State Machine)
+
+Construkt includes a runtime-first state machine architecture designed for large, side-effect-heavy UIKit features.
+
+At a high level:
+
+- `Intent` is an input event coming from UI/actions.
+- `reduce` synchronously computes a new state and schedules effects/outputs.
+- `effectExecutor` performs async work (API, storage, SDK wrappers) and returns feedback.
+- feedback can emit new intents (loop back through reducer) and outputs (one-off events).
+
+This model gives deterministic state updates, explicit side-effect scheduling, and predictable cancellation semantics.
+
+### Core Runtime Types
+
+Core runtime types live under `Sources/Construkt/Core/Runtime/`:
+
+- `FeatureSpec`: declarative contract for state, intents, effects, outputs, and dependencies.
+- `FeatureRuntime`: actor-based engine that runs reducer/effects and manages policies.
+- `FeatureStore`: UI-facing wrapper that exposes reactive `Property<State>` and `Signal<Output>`.
+- `EffectPolicy`: scheduling strategy per effect (`latest`, `queue`, etc).
+- `RuntimeScope`: hierarchical cancellation and lifecycle ownership.
+- `RuntimeJournal`: low-overhead trace of runtime events for diagnostics.
+
+### Runtime Data Flow
+
+```mermaid
+flowchart TD
+    UI[UI / Actions] -->|intent| RT[FeatureRuntime.send(intent)]
+    RT --> REDUCE[FeatureSpec.reduce]
+    REDUCE --> STATE[commit new state epoch]
+    REDUCE --> EFF[schedule effects by EffectPolicy]
+    EFF --> EXEC[effectExecutor]
+    EXEC --> FB[EffectFeedback intents + outputs]
+    FB -->|intents| RT
+    FB -->|outputs| STORE[FeatureStore.outputs]
+    STATE --> STORESTATE[FeatureStore.state]
+```
+
+### Defining a FeatureSpec
+
+Use `FeatureSpec` to describe your runtime contract.
+
+```swift
+import Construkt
+
+struct CounterFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var count = 0
+        var isSaving = false
+    }
+
+    enum Intent: Sendable {
+        case increment
+        case save
+        case saved
+    }
+
+    enum Effect: Sendable, Hashable {
+        case persistCount(Int)
+    }
+
+    enum Output: Sendable {
+        case didSave
+    }
+
+    struct Dependencies: Sendable {
+        let save: @Sendable (Int) async throws -> Void
+    }
+
+    static var initialState: State { .init() }
+
+    static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+        switch intent {
+        case .increment:
+            state.count += 1
+            return .none
+        case .save:
+            state.isSaving = true
+            return .init(effects: [.persistCount(state.count)])
+        case .saved:
+            state.isSaving = false
+            return .init(outputs: [.didSave])
+        }
+    }
+
+    static func policy(for effect: Effect) -> EffectPolicy {
+        .dropIfRunning("counter-save")
+    }
+}
+```
+
+### Effect Policies & Concurrency Semantics
+
+`EffectPolicy` controls how each effect type runs:
+
+- `.concurrent`: run all instances in parallel.
+- `.latest(key)`: allow all to start, but only the newest result for that key is accepted.
+- `.queue(key)`: serialize by key; next starts after previous completes.
+- `.dropIfRunning(key)`: ignore new requests while one is active.
+- `.restartable(key)`: cancel current and start the new request immediately.
+- `.debounce(key, delay)`: delay execution and coalesce bursts by key.
+
+Use stable, human-readable keys to make behavior obvious in code reviews and runtime logs.
+
+### Stale Effects and Error Mapping
+
+Two optional hooks on `FeatureSpec` help control async feedback behavior:
+
+- `staleStrategy(for:)`:
+  - `.drop` (default): discard effect feedback if state epoch changed since scheduling.
+  - `.accept`: always apply feedback regardless of epoch drift.
+- `mapEffectError(_:effect:)`:
+  - convert effect failures into typed intents for reducer-driven recovery.
+  - return `nil` to keep error handling external/no-op.
+
+This keeps async error handling explicit and state-safe.
+
+### FeatureStore API for UI Integration
+
+`FeatureStore` is the UI integration point:
+
+- `state: Property<F.State>` for bindings
+- `outputs: Signal<F.Output>` for one-off events (navigation/toasts)
+- `dispatch(_:)` for fire-and-forget intent sending
+- `sendAndWait(_:)` to await reducer processing for the intent
+- `sendAndDrain(_:)` to wait until runtime becomes idle (useful before reading derived state)
+
+```swift
+let store = FeatureStore<CounterFeature>(
+    dependencies: .init(save: { count in
+        try await api.saveCount(count)
+    })
+) { effect, dependencies in
+    switch effect {
+    case .persistCount(let value):
+        try await dependencies.save(value)
+        return .init(intents: [.saved])
+    }
+}
+
+store.dispatch(.increment)
+Task {
+    await store.sendAndDrain(.save)
+}
+```
+
+### Runtime Scope and Lifecycle
+
+`RuntimeScope` owns cancellable runtime tasks.
+
+- create a root with `RuntimeScope.root()`
+- create child scopes with `makeChild()` for sub-flows
+- `shutdown()` cancels registered tasks and recursively terminates children
+
+This gives deterministic teardown for feature lifecycles and prevents orphaned work.
+
+### Runtime Journal for Debugging
+
+`RuntimeJournal` captures a bounded trace of runtime events such as:
+
+- intent received
+- state committed (epoch)
+- effect scheduled/started/completed/cancelled/dropped/failed
+- output published
+
+Use `FeatureRuntime.journalSnapshot()` during debugging/tests to inspect policy behavior and race outcomes.
+
+### Testing Runtime Features
+
+Recommended testing split:
+
+- `FeatureSpec` tests:
+  - instantiate `FeatureStore` with mock dependencies
+  - assert state transitions, output emissions, and effect-driven paths
+  - include policy-sensitive cases (debounce/latest/queue/drop/restart)
+- `Actions` tests:
+  - verify SDK/bridge result mapping into intents
+- `Bridge` tests:
+  - verify third-party SDK error/value normalization into app-level types
+
+For flows that depend on settled async state, prefer `sendAndDrain` in tests.
 
 ---
 
