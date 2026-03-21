@@ -271,15 +271,15 @@ Core runtime types live under `Sources/Construkt/Core/Runtime/`:
 
 ```mermaid
 flowchart TD
-    UI[UI / Actions] -->|intent| RT[FeatureRuntime.send(intent)]
-    RT --> REDUCE[FeatureSpec.reduce]
-    REDUCE --> STATE[commit new state epoch]
-    REDUCE --> EFF[schedule effects by EffectPolicy]
-    EFF --> EXEC[effectExecutor]
-    EXEC --> FB[EffectFeedback intents + outputs]
+    UI["UI / Actions"] -->|intent| RT["FeatureRuntime send intent"]
+    RT --> REDUCE["FeatureSpec reduce"]
+    REDUCE --> STATE["commit new state epoch"]
+    REDUCE --> EFF["schedule effects by EffectPolicy"]
+    EFF --> EXEC["effectExecutor"]
+    EXEC --> FB["EffectFeedback: intents and outputs"]
     FB -->|intents| RT
-    FB -->|outputs| STORE[FeatureStore.outputs]
-    STATE --> STORESTATE[FeatureStore.state]
+    FB -->|outputs| STORE["FeatureStore outputs"]
+    STATE --> STORESTATE["FeatureStore state"]
 ```
 
 ### Defining a FeatureSpec
