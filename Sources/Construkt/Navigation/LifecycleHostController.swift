@@ -10,6 +10,12 @@ public class ViewLifecycleRegistry {
     var onLoad: (() -> Void)?
     var onAppear: ((Bool) -> Void)?
     var onDisappear: ((Bool) -> Void)?
+
+    func clearCallbacks() {
+        onLoad = nil
+        onAppear = nil
+        onDisappear = nil
+    }
 }
 
 private struct AssociatedKeys {
@@ -35,16 +41,49 @@ extension ModifiableView {
         ViewModifier(modifiableView) { $0.getRegistry().onLoad = action }
     }
 
+    /// Triggers when the mounting UIViewController fires `viewDidLoad` while weakly referencing a target.
+    @discardableResult
+    public func onHostDidLoad<Target: AnyObject>(on target: Target, _ action: @escaping (_ target: Target) -> Void) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) {
+            $0.getRegistry().onLoad = { [weak target] in
+                guard let target else { return }
+                action(target)
+            }
+        }
+    }
+
     /// Triggers when the mounting UIViewController fires `viewWillAppear`
     @discardableResult
     public func onHostWillAppear(_ action: @escaping (_ animated: Bool) -> Void) -> ViewModifier<Base> {
         ViewModifier(modifiableView) { $0.getRegistry().onAppear = action }
+    }
+
+    /// Triggers when the mounting UIViewController fires `viewWillAppear` while weakly referencing a target.
+    @discardableResult
+    public func onHostWillAppear<Target: AnyObject>(on target: Target, _ action: @escaping (_ target: Target, _ animated: Bool) -> Void) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) {
+            $0.getRegistry().onAppear = { [weak target] animated in
+                guard let target else { return }
+                action(target, animated)
+            }
+        }
     }
     
     /// Triggers when the mounting UIViewController fires `viewWillDisappear`
     @discardableResult
     public func onHostWillDisappear(_ action: @escaping (_ animated: Bool) -> Void) -> ViewModifier<Base> {
         ViewModifier(modifiableView) { $0.getRegistry().onDisappear = action }
+    }
+
+    /// Triggers when the mounting UIViewController fires `viewWillDisappear` while weakly referencing a target.
+    @discardableResult
+    public func onHostWillDisappear<Target: AnyObject>(on target: Target, _ action: @escaping (_ target: Target, _ animated: Bool) -> Void) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) {
+            $0.getRegistry().onDisappear = { [weak target] animated in
+                guard let target else { return }
+                action(target, animated)
+            }
+        }
     }
 }
 
@@ -90,7 +129,6 @@ open class LifecycleHostController: UIViewController {
     }
 
     deinit {
-        print("[BEKA] deallocated")
         if LifecycleHostTracker.shared.configuration.isEnabled, trackingId != nil {
             LifecycleHostTracker.shared.reportDealloc(self)
         }
@@ -105,6 +143,10 @@ open class LifecycleHostController: UIViewController {
         
         if parent == nil && hadParent && trackingId != nil {
             LifecycleHostTracker.shared.scheduleImmediateCheck(after: 2.0)
+        }
+
+        if parent == nil && hadParent {
+            clearLifecycleRegistry()
         }
     }
 
@@ -122,6 +164,7 @@ open class LifecycleHostController: UIViewController {
         
         let registry = objc_getAssociatedObject(contentView, &AssociatedKeys.lifecycleKey) as? ViewLifecycleRegistry
         registry?.onLoad?()
+        registry?.onLoad = nil
     }
     
     public override func viewWillAppear(_ animated: Bool) {
@@ -134,6 +177,12 @@ open class LifecycleHostController: UIViewController {
         super.viewWillDisappear(animated)
         let registry = objc_getAssociatedObject(contentView, &AssociatedKeys.lifecycleKey) as? ViewLifecycleRegistry
         registry?.onDisappear?(animated)
+    }
+
+    private func clearLifecycleRegistry() {
+        guard let registry = objc_getAssociatedObject(contentView, &AssociatedKeys.lifecycleKey) as? ViewLifecycleRegistry else { return }
+        registry.clearCallbacks()
+        objc_setAssociatedObject(contentView, &AssociatedKeys.lifecycleKey, nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 }
 

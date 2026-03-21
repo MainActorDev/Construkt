@@ -76,10 +76,12 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
     }
     
     public func setRoot(_ module: ConstruktPresentable, hideBar: Bool = false, animated: Bool = true, receiver: AnyRouteReceiving? = nil) {
+        let previousStack = navigationController.viewControllers
         let vc = module.toPresentable()
         vc.associatedCoordinator = receiver
         navigationController.setViewControllers([vc], animated: animated)
         navigationController.isNavigationBarHidden = hideBar
+        runCompletions(forRemovedFrom: previousStack, keeping: [vc])
     }
     
     public func push(_ module: ConstruktPresentable, animated: Bool = true, hideTabBar: Bool = false, completion: (() -> Void)? = nil, receiver: AnyRouteReceiving? = nil) {
@@ -154,6 +156,7 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
     }
     
     public func replaceStack(with modules: [ConstruktPresentable], completion: (() -> Void)? = nil, receiver: AnyRouteReceiving? = nil, animated: Bool = true) {
+        let previousStack = navigationController.viewControllers
         var newStack: [UIViewController] = []
         
         if let existingRoot = navigationController.viewControllers.first {
@@ -171,6 +174,7 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
         }
         
         navigationController.setViewControllers(newStack, animated: animated)
+        runCompletions(forRemovedFrom: previousStack, keeping: newStack)
     }
     
     // MARK: - UINavigationControllerDelegate
@@ -184,6 +188,12 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
     private func runCompletion(for vc: UIViewController) {
         if let completion = completions.removeValue(forKey: vc) {
             completion()
+        }
+    }
+
+    private func runCompletions(forRemovedFrom oldStack: [UIViewController], keeping newStack: [UIViewController]) {
+        for removedVC in oldStack where !newStack.contains(where: { $0 === removedVC }) {
+            runCompletion(for: removedVC)
         }
     }
     
