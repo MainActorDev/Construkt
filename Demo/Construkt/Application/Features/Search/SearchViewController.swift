@@ -3,10 +3,12 @@ import ConstruktKit
 
 public class SearchViewController: UIViewController {
 
-    private let viewModel: SearchViewModel
+    private let store: FeatureStore<SearchFeature>
+    @Variable private var searchQuery: String = ""
 
-    public init(viewModel: SearchViewModel = SearchViewModel()) {
-        self.viewModel = viewModel
+    public init(store: FeatureStore<SearchFeature> = SearchFeatureModule.makeStore()) {
+        self.store = store
+        self.searchQuery = store.state.wrappedValue.query
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -32,7 +34,7 @@ public class SearchViewController: UIViewController {
                         .alignment(.center)
                         .font(.systemFont(ofSize: 16, weight: .medium))
                         .visible(false)
-                        .onReceive(viewModel.isInitialObservable) { context in
+                        .onReceive(store.isInitialObservable) { context in
                             context.view.isHidden = !context.value
                         }
 
@@ -41,14 +43,14 @@ public class SearchViewController: UIViewController {
                         .alignment(.center)
                         .font(.systemFont(ofSize: 16, weight: .medium))
                         .visible(false)
-                        .onReceive(viewModel.isEmptyObservable) { context in
+                        .onReceive(store.isEmptyObservable) { context in
                             context.view.isHidden = !context.value
                         }
 
 
                     // List
                     CollectionView {
-                        AnySection(id: SearchSection.results, items: viewModel.moviesObservable) { movie in
+                        AnySection(id: SearchSection.results, items: store.moviesObservable) { movie in
                             AnyCell(movie, id: movie.id) { movie in
                                 MovieSearchRow(movie: movie)
                             }
@@ -56,7 +58,7 @@ public class SearchViewController: UIViewController {
                         .onSelect(on: self) { (self, movie: Movie) in
                             self.view.route(AppRoute.movieDetail(movieId: movie.id), sender: nil)
                         }
-                        .shimmer(count: 8, when: viewModel.isLoadingObservable) {
+                        .shimmer(count: 8, when: store.isLoadingObservable) {
                             MovieSearchRow(movie: .placeholder)
                         }
                         .layout {
@@ -87,7 +89,10 @@ public class SearchViewController: UIViewController {
                 .size(width: 20, height: 20)
             
             TextField("Search for a movie...")
-                .text(bidirectionalBind: viewModel.$searchQuery)
+                .text(bidirectionalBind: $searchQuery)
+                .onChange { [weak self] context in
+                    self?.store.updateSearchQuery(context.value ?? "")
+                }
                 .with { tf in
                     tf.font = .systemFont(ofSize: 16, weight: .regular)
                     tf.textColor = .white

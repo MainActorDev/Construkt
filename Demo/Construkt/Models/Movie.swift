@@ -78,7 +78,7 @@ public struct Movie: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
-public struct MovieResponse: Decodable, Equatable {
+public struct MovieResponse: Decodable, Equatable, Sendable {
     public let page: Int
     public let results: [Movie]
     public let totalPages: Int

@@ -1,7 +1,7 @@
 import Foundation
 import ConstruktKit
 
-public struct Cast: Decodable, Identifiable, Equatable {
+public struct Cast: Decodable, Identifiable, Equatable, Sendable {
     public let id: Int
     public let name: String
     public let character: String
@@ -20,7 +20,7 @@ public struct Cast: Decodable, Identifiable, Equatable {
     }
 }
 
-public struct Crew: Decodable, Identifiable, Equatable {
+public struct Crew: Decodable, Identifiable, Equatable, Sendable {
     public let id: Int
     public let name: String
     public let job: String
@@ -34,7 +34,7 @@ public struct Crew: Decodable, Identifiable, Equatable {
     }
 }
 
-public struct CreditsResponse: Decodable, Equatable {
+public struct CreditsResponse: Decodable, Equatable, Sendable {
     public let cast: [Cast]
     public let crew: [Crew]
 }

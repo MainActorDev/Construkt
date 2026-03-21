@@ -31,14 +31,14 @@ final class ScreenFactory: ScreenFactoryProtocol {
             if let gId = genreId, let gName = genreName {
                 selectedGenre = Genre(id: gId, name: gName)
             }
-            
-            let listViewModel = MovieListViewModel(
+
+            let store = MovieListFeatureModule.makeStore(
                 title: title,
                 sectionType: sectionType,
                 genres: allGenres ?? (selectedGenre != nil ? [selectedGenre!] : []),
                 selectedGenre: selectedGenre
             )
-            return MovieListViewController(viewModel: listViewModel)
+            return MovieListViewController(store: store)
             
         case .web(let url):
             let vc = UIViewController()

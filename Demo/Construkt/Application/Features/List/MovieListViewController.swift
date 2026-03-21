@@ -4,30 +4,31 @@ import ConstruktKit
 enum MovieListSection: String, SectionConfigIdentifier {
     case filter
     case grid
-    
+
     var uniqueId: String { rawValue }
 }
 
 class MovieListViewController: UIViewController {
-    
-    private let viewModel: MovieListViewModel
+
+    private let store: FeatureStore<MovieListFeature>
     private var filterCollectionViewWrapper: CollectionViewWrapperView?
-    
-    init(viewModel: MovieListViewModel) {
-        self.viewModel = viewModel
+
+    init(store: FeatureStore<MovieListFeature>) {
+        self.store = store
         super.init(nibName: nil, bundle: nil)
     }
-    
+
     required init?(coder: NSCoder) { nil }
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         observe()
+        store.loadInitial()
     }
-    
+
     private func observe() {
-        viewModel.$selectedGenre
+        store.selectedGenreObservable
             .compactMap { $0 }
             .distinctUntilChanged()
             .observe(on: .main) { [weak self] item in
@@ -35,7 +36,7 @@ class MovieListViewController: UIViewController {
             }
             .store(in: cancelBag)
     }
-    
+
     private func setupUI() {
         view.backgroundColor = UIColor("#0A0A0A")
         view.embed(
@@ -51,28 +52,28 @@ class MovieListViewController: UIViewController {
                     .clipsToBounds(true)
 
                     CollectionView {
-                         gridSection
+                        gridSection
                     }
-                    .pagination(model: viewModel.$paginationState) { [weak self] _ in
-                        self?.viewModel.loadMore()
+                    .pagination(model: store.paginationStateBinding) { [weak self] _ in
+                        self?.store.loadMore()
                     }
-                    .onRefresh(viewModel.$isLoading) { [weak self] in
-                        self?.viewModel.refresh()
+                    .onRefresh(store.isLoadingBinding) { [weak self] in
+                        self?.store.refresh()
                     }
                 }
                 .padding(top: 40)
-                
-                MovieListNavBar(title: viewModel.title, onTapBack: { [weak self] in
+
+                MovieListNavBar(title: store.title, onTapBack: { [weak self] in
                     self?.navigationController?.popViewController(animated: true)
                 })
             }
         )
     }
-    
+
     private var filterSection: AnySection {
         AnySection(
             id: MovieListSection.filter,
-            items: viewModel.filterItemsObservable
+            items: store.filterItemsObservable
         ) { item in
             AnyCell(item, id: item.id) { item in
                 GenresCell(
@@ -82,8 +83,8 @@ class MovieListViewController: UIViewController {
                 )
             }
         }
-        .onSelect(on: self) { (self, item: MovieListViewModel.FilterItem) in
-            self.viewModel.selectGenre(item.genre)
+        .onSelect(on: self) { (self, item: MovieListFilterItem) in
+            self.store.selectGenre(item.genre)
         }
         .layout { _ in
             .carousel(
@@ -94,17 +95,17 @@ class MovieListViewController: UIViewController {
             .insets(top: 8, leading: 16, bottom: 8, trailing: 16)
         }
     }
-    
+
     private var gridSection: AnySection {
         AnySection(
-            id:  MovieListSection.grid,
-            items: viewModel.moviesObservable.map { Array($0.enumerated()) },
-            footer: Footer { [viewModel] in
+            id: MovieListSection.grid,
+            items: store.moviesObservable.map { Array($0.enumerated()) },
+            footer: Footer { [store] in
                 CenteredView {
                     ZStackView {
                         ActivityIndicator(style: .large)
                             .color(.white)
-                            .animating(viewModel.$paginationState.map { $0.isPaginating })
+                            .animating(store.paginationStateBinding.map { $0.isPaginating })
                     }
                     .padding(12)
                 }
@@ -117,7 +118,7 @@ class MovieListViewController: UIViewController {
         .onSelect(on: self) { (self, movie: Movie) in
             self.showDetail(for: movie)
         }
-        .shimmer(count: 8, when: viewModel.$isLoading) {
+        .shimmer(count: 8, when: store.isLoadingBinding) {
             MovieGridCell(movie: .placeholder)
         }
         .layout { _ in
@@ -129,14 +130,14 @@ class MovieListViewController: UIViewController {
             .supplementaryFooter(height: .absolute(40))
         }
     }
-    
+
     private func showDetail(for movie: Movie) {
         let detailVC = MovieDetailView(movie: movie)
             .toPresentable(trackingLabel: "MovieDetailView(from:MovieList)")
         navigationController?.pushViewController(detailVC, animated: true)
     }
-    
-    private func scrollToFilter(_ id: Int) {        
+
+    private func scrollToFilter(_ id: Int) {
         guard let wrapper = filterCollectionViewWrapper,
               let dataSource = wrapper.collectionView.dataSource as? AnyCollectionDiffableDataSource,
               dataSource.snapshot().numberOfItems > 0 else {
@@ -145,7 +146,7 @@ class MovieListViewController: UIViewController {
             }
             return
         }
-        
+
         let searchKey = CellConfig(id: id)
         if let indexPath = dataSource.indexPath(for: searchKey) {
             wrapper.collectionView.layoutIfNeeded()

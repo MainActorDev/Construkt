@@ -9,7 +9,7 @@ public enum MovieDetailRoute {
 struct MovieDetailView: ViewConvertable {
     
     // MARK: - Properties
-    private let viewModel = MovieViewModel()
+    private let store: FeatureStore<MovieFeature>
     private let movie: Movie
     private let heroHeight: CGFloat = 450
     
@@ -31,14 +31,15 @@ struct MovieDetailView: ViewConvertable {
     private let handles = ViewHandles()
     
     // MARK: - Init
-    init(movie: Movie) {
+    init(movie: Movie, store: FeatureStore<MovieFeature> = MovieFeatureModule.makeStore()) {
         self.movie = movie
+        self.store = store
     }
     
     // MARK: - Body
     func asViews() -> [View] {
-        let details = viewModel.movieDetails.compactMap { $0 }
-        let casts = viewModel.movieCasts
+        let details = store.movieDetails.compactMap { $0 }
+        let casts = store.movieCasts
         
         return Screen {
             ZStackView {
@@ -48,7 +49,7 @@ struct MovieDetailView: ViewConvertable {
                     .onReceive(details.map { $0.backdropURL ?? $0.posterURL }) { context in
                         context.view.setImage(from: context.value)
                     }
-                    .onReceive(viewModel.isLoadingDetails) { context in
+                    .onReceive(store.isLoadingDetails) { context in
                         context.view.isHidden = context.value
                     }
                     .customConstraints { [handles, heroHeight] view in
@@ -92,9 +93,9 @@ struct MovieDetailView: ViewConvertable {
                                     print("Tapped on cast: \(cast.name)")
                                 }
                                 .accessibilityIdentifier(WalkthroughStepId.cast)
-                                MovieSimilar(details: details) { [scrollBinding, weak viewModel] movie in
+                                MovieSimilar(details: details) { [scrollBinding, weak store] movie in
                                     scrollBinding.scrollToTopTrigger += 1
-                                    viewModel?.selectMovie(movie)
+                                    store?.selectMovie(movie)
                                 }
                                 .accessibilityIdentifier(WalkthroughStepId.similar)
                             }
@@ -115,14 +116,14 @@ struct MovieDetailView: ViewConvertable {
                     .onReceive(scrollBinding.$scrollToTopTrigger.skip(1)) { [handles] _ in
                         handles.scrollView?.setContentOffset(.zero, animated: true)
                     }
-                    .onReceive(viewModel.isLoadingDetails) { context in
+                    .onReceive(store.isLoadingDetails) { context in
                         context.view.isHidden = context.value
                     }
                     
                     // Loading Indicator
                     LoadingView()
                         .visible(false)
-                        .onReceive(viewModel.isLoadingDetails) { context in
+                        .onReceive(store.isLoadingDetails) { context in
                             context.view.isHidden = !context.value
                         }
                         .backgroundColor(.black.withAlphaComponent(0.5))
@@ -140,7 +141,7 @@ struct MovieDetailView: ViewConvertable {
         }
         .contentUnderNavBar(false)
         .backgroundColor(UIColor("#0A0A0A"))
-        .onReceive(viewModel.isLoadingDetails.skip(1)) { [walkthroughSteps] context in
+        .onReceive(store.isLoadingDetails.skip(1)) { [walkthroughSteps] context in
             // Wait for loading to finish (false) before showing walkthrough
             guard !context.value else { return }
             
@@ -162,7 +163,7 @@ struct MovieDetailView: ViewConvertable {
             }
         }
         .onHostDidLoad {
-            viewModel.selectMovie(movie)
+            store.selectMovie(movie)
         }
         .asViews()
     }

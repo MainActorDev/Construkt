@@ -16,9 +16,11 @@ enum ExploreSection: String, SectionConfigIdentifier {
 }
 
 struct ExploreView: ViewConvertable {
-    
-    // We bind the viewModel at initialization.
-    private let viewModel = ExploreViewModel()
+    private let store: FeatureStore<ExploreFeature>
+
+    init(store: FeatureStore<ExploreFeature> = ExploreFeatureModule.makeStore()) {
+        self.store = store
+    }
     
     func asViews() -> [View] {
         Screen {
@@ -51,7 +53,7 @@ struct ExploreView: ViewConvertable {
         }
         .backgroundColor(UIColor(white: 0.04, alpha: 1)) // Neutral 950
         .onHostDidLoad {
-            viewModel.loadData()
+            store.dispatch(.loadData)
         }
         .asViews()
     }
@@ -61,7 +63,7 @@ struct ExploreView: ViewConvertable {
     private var genresSection: AnySection {
         AnySection(
             id: ExploreSection.genres,
-            items: viewModel.$genres,
+            items: store.state.map { $0.genres },
             header: Header {
                 ExploreHeader(title: "Browse Genres", subtitle: nil)
             }
@@ -72,7 +74,7 @@ struct ExploreView: ViewConvertable {
         }
         .onRoute { (genre: ExploreGenre) -> AppRoute? in
             guard let genreId = Int(genre.id) else { return nil }
-            let allGenres = viewModel.allGenres.compactMap {
+            let allGenres = store.state.wrappedValue.allGenres.compactMap {
                 guard let id = Int($0.id) else { return nil as Genre? }
                 return Genre(id: id, name: $0.name)
             }
@@ -98,7 +100,7 @@ struct ExploreView: ViewConvertable {
     private var collectionsSection: AnySection {
         AnySection(
             id: ExploreSection.collections,
-            items: viewModel.$collections,
+            items: store.state.map { $0.collections },
             header: Header {
                 ExploreHeader(title: "Curated Collections", subtitle: "Hand-picked by our editors")
             }
@@ -124,7 +126,7 @@ struct ExploreView: ViewConvertable {
     private var arrivalsSection: AnySection {
         AnySection(
             id: ExploreSection.arrivals,
-            items: viewModel.$arrivals,
+            items: store.state.map { $0.arrivals },
             header: Header {
                 ExploreHeader(title: "Just Arrived", subtitle: "New titles this week")
             }

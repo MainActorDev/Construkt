@@ -3,7 +3,7 @@ import ConstruktKit
 
 /// A protocol that allows LoadableState properties to be accessed homogeneously, enabling direct `ViewBinding` property bridging.
 public protocol LoadableStateProtocol {
-    associatedtype StateType: Equatable
+    associatedtype StateType: Equatable & Sendable
     var isLoading: Bool { get }
     var loadedValue: StateType? { get }
     var error: String? { get }
@@ -11,7 +11,7 @@ public protocol LoadableStateProtocol {
 
 /// A generic state enum for loading data.
 /// Automatically handles "production grade" features like Stable Cache Keys and Smart Updates.
-public enum LoadableState<T: Equatable>: Equatable, EquivalentState, CacheKeyProviding, LoadableStateProtocol {
+public enum LoadableState<T: Equatable & Sendable>: Equatable, Sendable, EquivalentState, CacheKeyProviding, LoadableStateProtocol {
     case initial
     case loading
     case loaded(T)
@@ -69,4 +69,3 @@ public enum LoadableState<T: Equatable>: Equatable, EquivalentState, CacheKeyPro
 
 // MARK: - Hashable Conformance
 extension LoadableState: Hashable where T: Hashable {}
-

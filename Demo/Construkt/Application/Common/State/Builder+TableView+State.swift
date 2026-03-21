@@ -5,7 +5,7 @@ extension ModifiableView where Base: BuilderInternalTableView {
     /// Automatically handles smart updates for LoadableState by injecting new data into the builder.
     /// - Parameter type: The type of the items in the list (e.g. User.self)
     @discardableResult
-    public func enableSmartUpdate<T: Equatable>(_ type: T.Type) -> ViewModifier<Base> {
+    public func enableSmartUpdate<T: Equatable & Sendable>(_ type: T.Type) -> ViewModifier<Base> {
         ViewModifier(modifiableView) { view in
              view.updateHandler = { [weak view] state in
                  guard let view = view else { return }
