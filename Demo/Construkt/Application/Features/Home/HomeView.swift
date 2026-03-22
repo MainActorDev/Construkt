@@ -7,9 +7,11 @@ import UIKit
 import ConstruktKit
 
 struct HomeView: ViewConvertable {
-    
-    // We bind the viewModel at initialization.
-    private let viewModel = MovieViewModel()
+    private let store: FeatureStore<MovieFeature>
+
+    init(store: FeatureStore<MovieFeature> = MovieFeatureModule.makeStore()) {
+        self.store = store
+    }
     
     
     // MARK: - State
@@ -68,12 +70,12 @@ struct HomeView: ViewConvertable {
                 upcomingSection
                 topRatedSection
             }
-            .emptyState(when: viewModel.isEmptyObservable) {
+            .emptyState(when: store.isEmptyObservable) {
                 EmptyView(
                     title: "No movies found",
                     subtitle: "Check your connection.",
                     buttonTitle: "Retry",
-                    onAction: { [weak viewModel] in viewModel?.loadHomeData() }
+                    onAction: { [weak store] in store?.loadHomeData() }
                 )
             }
             .backgroundColor(UIColor("#0A0A0A"))
@@ -83,8 +85,8 @@ struct HomeView: ViewConvertable {
                 view.collectionView.showsVerticalScrollIndicator = false
                 handles.collectionView = view.collectionView
             }
-            .onRefresh(viewModel.isNowPlayingLoading) { [weak viewModel] in
-                viewModel?.loadHomeData()
+            .onRefresh(store.isNowPlayingLoading) { [weak store] in
+                store?.loadHomeData()
             }
             .onScroll { [scrollBinding] scrollView in
                 scrollBinding.offset = scrollView.contentOffset.y
@@ -92,7 +94,7 @@ struct HomeView: ViewConvertable {
         }
         .navigationBar {
             HomeNavigationBar(
-                isLoading: viewModel.isNowPlayingLoading,
+                isLoading: store.isNowPlayingLoading,
                 scrollOffset: scrollBinding.$offset.eraseToAnyViewBinding(),
                 onSearchTap: { sender in
                     sender.route(AppRoute.search, sender: nil)
@@ -102,7 +104,7 @@ struct HomeView: ViewConvertable {
         .contentUnderNavBar(false)
         .margins(bottom: 100)
         .onHostDidLoad {
-            viewModel.loadHomeData()
+            store.loadHomeData()
             // Show walkthrough after data loads
             showWalkthrough()
         }
@@ -119,7 +121,7 @@ struct HomeView: ViewConvertable {
     // MARK: - Sections
     
     private var heroSection: AnySection {
-        AnySection(id: HomeSection.hero, items: viewModel.nowPlayingMovies.map { Array($0.prefix(5)) }) { movie in
+        AnySection(id: HomeSection.hero, items: store.nowPlayingMovies.map { Array($0.prefix(5)) }) { movie in
             AnyCell(movie, id: "hero-\(movie.id)") { movie in
                 Modified(HeroContentView()) { view in
                     view.configure(with: movie)
@@ -138,10 +140,10 @@ struct HomeView: ViewConvertable {
             }
             return layout
         }
-        .footer { [weak autoscrollController, weak viewModel] in
+        .footer { [weak autoscrollController, weak store] in
             Footer(id: "page-control") {
-                if let vm = viewModel, let ac = autoscrollController {
-                    DynamicContainerView(vm.nowPlayingMovies.map { Array($0.prefix(5)) }) { movies in
+                if let store, let ac = autoscrollController {
+                    DynamicContainerView(store.nowPlayingMovies.map { Array($0.prefix(5)) }) { movies in
                         if movies.count > 0 {
                             CustomPageControl(count: movies.count, currentIndex: ac.currentIndex)
                         } else {
@@ -153,7 +155,7 @@ struct HomeView: ViewConvertable {
                 }
             }
         }
-        .shimmer(count: 1, when: viewModel.isNowPlayingLoading) {
+        .shimmer(count: 1, when: store.isNowPlayingLoading) {
             Modified(HeroContentView()) { $0.configure(with: .placeholder) }
         }
     }
@@ -161,7 +163,7 @@ struct HomeView: ViewConvertable {
     private var genresSection: AnySection {
         AnySection(
             id: HomeSection.categories,
-            items: viewModel.genres,
+            items: store.genres,
             header: Header {
                 StandardHeader(title: "Genres", actionTitle: nil, sectionId: WalkthroughStepId.genres)
             }
@@ -176,12 +178,12 @@ struct HomeView: ViewConvertable {
                 sectionTypeRaw: HomeSection.categories.rawValue,
                 genreId: genre.id,
                 genreName: genre.name,
-                allGenres: viewModel.currentGenres
+                allGenres: store.currentGenres
             )
         }
         .shimmer(
             count: 6,
-            when: viewModel.isLoadingGenres,
+            when: store.isLoadingGenres,
             includeSupplementary: true
         ) {
             GenresCell(id: -2, genre: .placeholder)
@@ -194,7 +196,7 @@ struct HomeView: ViewConvertable {
     private var popularSection: AnySection {
         AnySection(
             id: HomeSection.popular,
-            items: viewModel.popularSectionMovies,
+            items: store.popularSectionMovies,
             header: Header {
                 StandardHeader(title: "Popular Now", actionTitle: "See All", sectionId: WalkthroughStepId.popular)
             }
@@ -215,7 +217,7 @@ struct HomeView: ViewConvertable {
         }
         .shimmer(
             count: 4,
-            when: viewModel.isPopularSectionLoading,
+            when: store.isPopularSectionLoading,
             includeSupplementary: true
         ) {
             PosterCell(movie: .placeholder)
@@ -225,7 +227,7 @@ struct HomeView: ViewConvertable {
     private var upcomingSection: AnySection {
         AnySection(
             id: HomeSection.upcoming,
-            items: viewModel.upcomingMovies.map { $0.asRenderItems() },
+            items: store.upcomingMovies.map { $0.asRenderItems() },
             header: Header {
                 StandardHeader(title: "Upcoming", actionTitle: "See All", sectionId: WalkthroughStepId.upcoming)
             }
@@ -240,7 +242,7 @@ struct HomeView: ViewConvertable {
         }
         .shimmer(
             count: 2,
-            when: viewModel.isUpcomingLoading,
+            when: store.isUpcomingLoading,
             includeSupplementary: true
         ) {
             UpcomingCell(item: .placeholder)
@@ -250,7 +252,7 @@ struct HomeView: ViewConvertable {
     private var topRatedSection: AnySection {
         AnySection(
             id: HomeSection.topRated,
-            items: viewModel.topRatedMovies.map { Array($0.enumerated()) },
+            items: store.topRatedMovies.map { Array($0.enumerated()) },
             header: Header {
                 StandardHeader(title: "Top Rated", actionTitle: nil)
             }
@@ -271,7 +273,7 @@ struct HomeView: ViewConvertable {
         .layout { _ in
             HomeSection.topRated.layout
         }
-        .shimmer(count: 3, when: viewModel.isTopRatedLoading) {
+        .shimmer(count: 3, when: store.isTopRatedLoading) {
             TopRatedCell(index: 0, movie: .placeholder)
         }
     }
@@ -338,14 +340,14 @@ struct HomeView: ViewConvertable {
     }
     
     private func showWalkthrough() {
-        guard !viewModel.walkthroughShown else { return }
+        guard !UserDefaults.standard.bool(forKey: "walkthrough_shown") else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             guard let window = UIApplication.shared.firstKeyWindow else { return }
             
             let overlay = WalkthroughOverlayView(
                 steps: walkthroughSteps,
-                onDismiss: { [viewModel] in
-                    viewModel.walkthroughShown = true
+                onDismiss: {
+                    UserDefaults.standard.set(true, forKey: "walkthrough_shown")
                 })
             overlay.translatesAutoresizingMaskIntoConstraints = false
             window.addSubview(overlay)

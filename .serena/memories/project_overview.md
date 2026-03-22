@@ -1,0 +1,1 @@
+Construkt is a Swift Package that provides a declarative UIKit framework (SwiftUI-like syntax) and a runtime-first state machine architecture (FeatureSpec/FeatureStore/FeatureRuntime) for iOS apps. Main library target is `ConstruktKit` under `Sources/Construkt`, with tests in `Tests`.

@@ -3,7 +3,7 @@ import ConstruktKit
 
 // MARK: - Search Bar Component
 struct ExploreSearchBar: ViewBuilder {
-    let viewModel: ExploreViewModel
+    let queryBinding: Property<String>
     
     var body: View {
         HStackView {
@@ -12,7 +12,7 @@ struct ExploreSearchBar: ViewBuilder {
                 .size(width: 20, height: 20)
             
             TextField(placeholder: "Movies, shows, actors...")
-                .text(bidirectionalBind: viewModel.$searchQuery)
+                .text(bidirectionalBind: queryBinding)
                 .with {
                     $0.font = .systemFont(ofSize: 14, weight: .medium)
                 }

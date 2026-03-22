@@ -544,6 +544,33 @@ CollectionView {
 }
 ```
 
+For non-array bindings, use `binding:`, `item:`, or `when:`:
+
+```swift
+CollectionView {
+    // Bool gate: section exists only when true
+    AnySection(id: "login", when: viewModel.showLoginBar) {
+        AnyCell("login", id: "login") { _ in
+            LoginBarCell()
+        }
+    }
+
+    // Single model binding (non-array)
+    AnySection(id: "profile", item: viewModel.profile) { profile in
+        AnyCell(profile, id: profile.id) { model in
+            ProfileCell(model: model)
+        }
+    }
+
+    // Optional model binding (renders nothing when nil)
+    AnySection(id: "promo", item: viewModel.activePromo) { promo in
+        AnyCell(promo, id: promo.id) { model in
+            PromoCell(model: model)
+        }
+    }
+}
+```
+
 ### Static Collection Views
 
 You can also build statically-defined declarative collections (e.g., Settings menus) by listing explicit `AnyCell` components within a `AnySection`:

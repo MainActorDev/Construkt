@@ -6,7 +6,7 @@ import Foundation
 import ConstruktKit
 
 /// A standard struct modeling pagination state, tailored for infinite scrolling within `CollectionListViewController`s.
-public struct ListPaginationModel: Equatable {
+public struct ListPaginationModel: Equatable, Sendable {
     public let currentPage: Int
     /// Set to true if a network request is currently in flight for the *next* page.
     public let isPaginating: Bool

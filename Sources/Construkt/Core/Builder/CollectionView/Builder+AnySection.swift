@@ -269,6 +269,78 @@ public struct AnySection: AnySectionObservable {
             }
     }
 
+    /// Reactive boolean gate initializer.
+    ///
+    /// Builds the section content when `binding` emits `true`, and removes the section when `false`.
+    public init<B: ViewBinding>(
+        id: SectionConfigIdentifier,
+        when binding: B,
+        @AnyAnySectionContentBuilder content: @escaping () -> AnySectionContent
+    ) where B.Value == Bool {
+        self.binding = binding.map { isVisible in
+            guard isVisible else { return [] }
+
+            let sectionContent = content()
+            let section = SectionConfig(
+                identifier: id,
+                cells: sectionContent.cells,
+                header: sectionContent.header,
+                footer: sectionContent.footer,
+                layoutProvider: nil
+            )
+            return [section]
+        }
+    }
+
+    /// Reactive single-item initializer.
+    ///
+    /// Use this when your section is driven by one non-array model.
+    public init<B: ViewBinding, Item>(
+        id: SectionConfigIdentifier,
+        item binding: B,
+        header: Header? = nil,
+        footer: Footer? = nil,
+        @AnyCellResultBuilder content: @escaping (Item) -> [CellConfig]
+    ) where B.Value == Item {
+        self.binding = binding
+            .map { item in
+                [
+                    SectionConfig(
+                        identifier: id,
+                        cells: content(item),
+                        header: header?.controller,
+                        footer: footer?.controller,
+                        layoutProvider: nil
+                    )
+                ]
+            }
+    }
+
+    /// Reactive optional single-item initializer.
+    ///
+    /// Emits no section when the value is `nil` and one section when non-nil.
+    public init<B: ViewBinding, Item>(
+        id: SectionConfigIdentifier,
+        item binding: B,
+        header: Header? = nil,
+        footer: Footer? = nil,
+        @AnyCellResultBuilder content: @escaping (Item) -> [CellConfig]
+    ) where B.Value == Item? {
+        self.binding = binding
+            .map { item in
+                guard let item = item else { return [] }
+                return [
+                    SectionConfig(
+                        identifier: id,
+                        cells: content(item),
+                        header: header?.controller,
+                        footer: footer?.controller,
+                        layoutProvider: nil
+                    )
+                ]
+            }
+    }
+
     // MARK: - Actions Modifier
     
     /// Attaches a type-safe, imperative selection action to every item within this section.
