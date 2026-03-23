@@ -554,8 +554,72 @@ public struct AnySection: AnySectionObservable {
              }
          }
          return AnySection(binding: improved)
-     }
-    
+      }
+
+    /// Hides or shows the section header reactively using a boolean binding.
+    ///
+    /// - Important: This uses `distinctUntilChanged` to avoid unnecessary section updates when the
+    ///   incoming visibility value repeats.
+    public func headerHidden<B: ViewBinding>(when hiddenBinding: B) -> AnySection where B.Value == Bool {
+        let hidden = hiddenBinding.distinctUntilChanged()
+
+        let improved = AnyViewBinding<([SectionConfig], Bool)>
+            .combineLatest(binding, hidden)
+            .map { sections, isHidden in
+                sections.map { section in
+                    let updatedHeader = isHidden ? nil : section.header
+
+                    if (section.header == nil) == (updatedHeader == nil), section.header?.id == updatedHeader?.id {
+                        return section
+                    }
+
+                    return SectionConfig(
+                        identifier: section.identifier,
+                        cells: section.cells,
+                        header: updatedHeader,
+                        footer: section.footer,
+                        layoutProvider: section.layoutProvider,
+                        layoutModifiers: section.layoutModifiers,
+                        decorationProviders: section.decorationProviders
+                    )
+                }
+            }
+
+        return AnySection(binding: improved)
+    }
+
+    /// Hides or shows the section footer reactively using a boolean binding.
+    ///
+    /// - Important: This uses `distinctUntilChanged` to avoid unnecessary section updates when the
+    ///   incoming visibility value repeats.
+    public func footerHidden<B: ViewBinding>(when hiddenBinding: B) -> AnySection where B.Value == Bool {
+        let hidden = hiddenBinding.distinctUntilChanged()
+
+        let improved = AnyViewBinding<([SectionConfig], Bool)>
+            .combineLatest(binding, hidden)
+            .map { sections, isHidden in
+                sections.map { section in
+                    let updatedFooter = isHidden ? nil : section.footer
+
+                    if (section.footer == nil) == (updatedFooter == nil), section.footer?.id == updatedFooter?.id {
+                        return section
+                    }
+
+                    return SectionConfig(
+                        identifier: section.identifier,
+                        cells: section.cells,
+                        header: section.header,
+                        footer: updatedFooter,
+                        layoutProvider: section.layoutProvider,
+                        layoutModifiers: section.layoutModifiers,
+                        decorationProviders: section.decorationProviders
+                    )
+                }
+            }
+
+        return AnySection(binding: improved)
+    }
+     
     /// Adds decoration items to the section's layout.
     public func decorationItems(_ items: [NSCollectionLayoutDecorationItem]) -> AnySection {
         let improved = binding.map { sections in
