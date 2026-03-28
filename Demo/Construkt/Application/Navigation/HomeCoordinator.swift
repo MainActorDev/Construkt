@@ -75,6 +75,7 @@ final class HomeCoordinator: BaseCoordinator, RouteHandlingCoordinator {
                         .alignment(.center)
                     }
                 },
+                message: message,
                 config: config
             )
             
