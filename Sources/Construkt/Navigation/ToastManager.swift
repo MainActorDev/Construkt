@@ -7,16 +7,77 @@ import UIKit
 
 @MainActor
 public final class ToastManager {
+
+    public enum ToastQueueBehavior {
+        case stacked
+        case replaced
+    }
     
     public static let shared = ToastManager()
+
+    public var queueBehavior: ToastQueueBehavior = .replaced
     
     private var activeToasts: [(toast: ToastItem, view: ToastItemView)] = []
     private var containerView: UIView?
     private weak var hostWindow: UIWindow?
     
     private init() {}
+
+    nonisolated public static func isDisplayableMessage(_ message: String?) -> Bool {
+        guard let trimmed = message?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        return !trimmed.isEmpty
+    }
+
+    static func hasDisplayableText(in view: UIView) -> Bool {
+        var hasTextBearingSubview = false
+
+        func scan(_ currentView: UIView) -> Bool {
+            if let label = currentView as? UILabel {
+                hasTextBearingSubview = true
+                if isDisplayableMessage(label.text) { return true }
+            } else if let textField = currentView as? UITextField {
+                hasTextBearingSubview = true
+                if isDisplayableMessage(textField.text) { return true }
+            } else if let textView = currentView as? UITextView {
+                hasTextBearingSubview = true
+                if isDisplayableMessage(textView.text) { return true }
+            } else if let button = currentView as? UIButton {
+                hasTextBearingSubview = true
+                if isDisplayableMessage(button.currentTitle) { return true }
+            }
+
+            for child in currentView.subviews {
+                if scan(child) { return true }
+            }
+
+            return false
+        }
+
+        if scan(view) {
+            return true
+        }
+
+        return !hasTextBearingSubview
+    }
+
+    static func edgeStackOrder<Item>(_ items: [Item]) -> [Item] {
+        Array(items.reversed())
+    }
+
+    public func show(message: String?, content: UIViewController, config: ToastConfiguration, in window: UIWindow) {
+        guard Self.isDisplayableMessage(message) else { return }
+        show(content: content, config: config, in: window)
+    }
     
     public func show(content: UIViewController, config: ToastConfiguration, in window: UIWindow) {
+        guard Self.hasDisplayableText(in: content.view) else { return }
+
+        if queueBehavior == .replaced, !activeToasts.isEmpty {
+            dismissAll(animated: false)
+        }
+
         setupContainerIfNeeded(in: window)
         
         let toast = ToastItem(content: content, config: config)
@@ -127,8 +188,8 @@ public final class ToastManager {
         let containerBounds = containerView.bounds
         let safeArea = containerView.safeAreaInsets
         
-        let topToasts = activeToasts.filter { $0.toast.config.position.isTop }
-        let bottomToasts = activeToasts.filter { $0.toast.config.position.isBottom }
+        let topToasts = Self.edgeStackOrder(activeToasts.filter { $0.toast.config.position.isTop })
+        let bottomToasts = Self.edgeStackOrder(activeToasts.filter { $0.toast.config.position.isBottom })
         
         var currentTopY = safeArea.top
         for (index, item) in topToasts.enumerated() {
@@ -179,18 +240,20 @@ public final class ToastManager {
             default: offset = 0
             }
                         
-            currentBottomY -= spacing
-            
             if index == 0 {
-                currentBottomY -= offset
+                currentBottomY -= offset + spacing
             }
+
+            let targetY = currentBottomY - item.view.frame.height
             
             let targetFrame = CGRect(
                 x: item.view.frame.origin.x,
-                y: currentBottomY,
+                y: targetY,
                 width: item.view.frame.width,
                 height: item.view.frame.height
             )
+
+            currentBottomY = targetY - spacing
             
             if animated {
                 UIView.animate(

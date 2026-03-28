@@ -59,6 +59,11 @@ public extension ConstruktRouter {
     func showToast(_ module: ConstruktPresentable, config: ToastConfiguration = .bottom()) {
         showToast(module, config: config)
     }
+
+    func showToast(_ module: ConstruktPresentable, message: String?, config: ToastConfiguration = .bottom()) {
+        guard ToastManager.isDisplayableMessage(message) else { return }
+        showToast(module, config: config)
+    }
     
     func replaceStack(with modules: [ConstruktPresentable], completion: (() -> Void)? = nil, receiver: AnyRouteReceiving? = nil, animated: Bool = true) {
         replaceStack(with: modules, completion: completion, receiver: receiver, animated: animated)
