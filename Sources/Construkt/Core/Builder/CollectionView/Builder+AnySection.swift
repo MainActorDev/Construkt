@@ -566,10 +566,17 @@ public struct AnySection: AnySectionObservable {
         let improved = AnyViewBinding<([SectionConfig], Bool)>
             .combineLatest(binding, hidden)
             .map { sections, isHidden in
-                sections.map { section in
-                    let updatedHeader = isHidden ? nil : section.header
+                return sections.map { section in
+                    let updatedHeader: SupplementaryController?
+                    if var header = section.header {
+                        header.isHidden = isHidden
+                        updatedHeader = header
+                    } else {
+                        updatedHeader = nil
+                    }
 
-                    if (section.header == nil) == (updatedHeader == nil), section.header?.id == updatedHeader?.id {
+                    if section.header?.id == updatedHeader?.id,
+                       section.header?.isHidden == updatedHeader?.isHidden {
                         return section
                     }
 
@@ -599,9 +606,16 @@ public struct AnySection: AnySectionObservable {
             .combineLatest(binding, hidden)
             .map { sections, isHidden in
                 sections.map { section in
-                    let updatedFooter = isHidden ? nil : section.footer
+                    let updatedFooter: SupplementaryController?
+                    if var footer = section.footer {
+                        footer.isHidden = isHidden
+                        updatedFooter = footer
+                    } else {
+                        updatedFooter = nil
+                    }
 
-                    if (section.footer == nil) == (updatedFooter == nil), section.footer?.id == updatedFooter?.id {
+                    if section.footer?.id == updatedFooter?.id,
+                       section.footer?.isHidden == updatedFooter?.isHidden {
                         return section
                     }
 

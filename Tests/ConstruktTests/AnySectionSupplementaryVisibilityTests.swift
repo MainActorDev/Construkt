@@ -37,14 +37,19 @@ struct AnySectionSupplementaryVisibilityTests {
 
         hidden.wrappedValue = true
         #expect(emissions.count == 2)
-        #expect(emissions[1][0].header == nil)
+        let hiddenHeader = emissions[1][0].header
+        #expect(hiddenHeader != nil)
+        #expect(hiddenHeader?.id as? String == "header-id")
+        #expect(hiddenHeader?.isHidden == true)
 
         hidden.wrappedValue = true
         #expect(emissions.count == 2)
 
         hidden.wrappedValue = false
         #expect(emissions.count == 3)
-        #expect(emissions[2][0].header?.id as? String == "header-id")
+        let visibleHeader = emissions[2][0].header
+        #expect(visibleHeader?.id as? String == "header-id")
+        #expect(visibleHeader?.isHidden == false)
     }
 
     @Test("footerHidden updates only when visibility changes")
@@ -79,14 +84,19 @@ struct AnySectionSupplementaryVisibilityTests {
 
         hidden.wrappedValue = true
         #expect(emissions.count == 2)
-        #expect(emissions[1][0].footer == nil)
+        let hiddenFooter = emissions[1][0].footer
+        #expect(hiddenFooter != nil)
+        #expect(hiddenFooter?.id as? String == "footer-id")
+        #expect(hiddenFooter?.isHidden == true)
 
         hidden.wrappedValue = true
         #expect(emissions.count == 2)
 
         hidden.wrappedValue = false
         #expect(emissions.count == 3)
-        #expect(emissions[2][0].footer?.id as? String == "footer-id")
+        let visibleFooter = emissions[2][0].footer
+        #expect(visibleFooter?.id as? String == "footer-id")
+        #expect(visibleFooter?.isHidden == false)
     }
 }
 

@@ -69,6 +69,7 @@ public extension AnyCollectionDiffableDataSource {
                 // Check if header changed ID
                 if let newHeader = newSection.header, let oldHeader = oldSection.header {
                     if newHeader.id != oldHeader.id { return true }
+                    if newHeader.isHidden != oldHeader.isHidden { return true }
                 } else if (newSection.header == nil) != (oldSection.header == nil) {
                     return true
                 }
@@ -76,6 +77,7 @@ public extension AnyCollectionDiffableDataSource {
                 // Check if footer changed ID
                 if let newFooter = newSection.footer, let oldFooter = oldSection.footer {
                     if newFooter.id != oldFooter.id { return true }
+                    if newFooter.isHidden != oldFooter.isHidden { return true }
                 } else if (newSection.footer == nil) != (oldSection.footer == nil) {
                     return true
                 }
