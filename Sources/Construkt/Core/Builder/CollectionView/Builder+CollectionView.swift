@@ -60,18 +60,7 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
         }
     }
 
-    private func fallbackSupplementary(
-        in collectionView: UICollectionView,
-        kind: String,
-        at indexPath: IndexPath
-    ) -> UICollectionReusableView? {
-        if kind == UICollectionView.elementKindSectionHeader {
-            return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyHeader", for: indexPath)
-        } else if kind == UICollectionView.elementKindSectionFooter {
-            return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyFooter", for: indexPath)
-        }
-        return nil
-    }
+
     
     public private(set) lazy var collectionView: UICollectionView = {
         let cv = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
@@ -104,17 +93,21 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
                 return nil
             }
 
+            func dequeueFallback() -> UICollectionReusableView {
+                if kind == UICollectionView.elementKindSectionHeader {
+                    return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyHeader", for: indexPath)
+                } else {
+                    return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyFooter", for: indexPath)
+                }
+            }
+
             // Identify section via currentSectionMap for O(1) lookup and guaranteed
             // consistency with the layout provider (both read the same source of truth).
             guard let self = self,
                   let identifier = self.dataSource.sectionIdentifier(at: indexPath.section),
                   let section = self.currentSectionMap[identifier]
             else {
-                return self?.fallbackSupplementary(
-                    in: collectionView,
-                    kind: kind,
-                    at: indexPath
-                )
+                return dequeueFallback()
             }
             
             if kind == UICollectionView.elementKindSectionHeader,
@@ -129,12 +122,7 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
                 return footer.dequeue(collectionView, indexPath)
             }
 
-            return self.fallbackSupplementary(
-                in: collectionView,
-                kind: kind,
-                at: indexPath
-            )
-            
+            return dequeueFallback()
         }
         
         return ds
