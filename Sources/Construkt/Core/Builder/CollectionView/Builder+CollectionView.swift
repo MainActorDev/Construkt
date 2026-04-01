@@ -46,12 +46,40 @@ public struct CollectionView: ModifiableView {
 /// The internal `UIView` subclass responsible for hosting the actual `UICollectionView` and
 /// maintaining the Diffable Data Source mappings.
 public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
+    /// A zero-height supplementary view returned when a header/footer is hidden.
+    /// Overrides `preferredLayoutAttributesFitting` so that UICollectionViewCompositionalLayout
+    /// collapses this view to zero height when using `.estimated` sizing.
+    private final class EmptySupplementaryView: UICollectionReusableView {
+        override func preferredLayoutAttributesFitting(
+            _ layoutAttributes: UICollectionViewLayoutAttributes
+        ) -> UICollectionViewLayoutAttributes {
+            let attrs = super.preferredLayoutAttributesFitting(layoutAttributes)
+            attrs.frame.size.height = 0
+            attrs.size.height = 0
+            return attrs
+        }
+    }
+
+    private func fallbackSupplementary(
+        in collectionView: UICollectionView,
+        kind: String,
+        at indexPath: IndexPath
+    ) -> UICollectionReusableView? {
+        if kind == UICollectionView.elementKindSectionHeader {
+            return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyHeader", for: indexPath)
+        } else if kind == UICollectionView.elementKindSectionFooter {
+            return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyFooter", for: indexPath)
+        }
+        return nil
+    }
     
     public private(set) lazy var collectionView: UICollectionView = {
         let cv = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
         cv.backgroundColor = .clear
         cv.clipsToBounds = false
         cv.delegate = self
+        cv.register(EmptySupplementaryView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "FallbackEmptyHeader")
+        cv.register(EmptySupplementaryView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "FallbackEmptyFooter")
         return cv
     }()
     
@@ -72,19 +100,41 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
         )
         
         ds.supplementaryViewProvider = { [weak self] collectionView, kind, indexPath in
-            // Identify section
+            guard kind == UICollectionView.elementKindSectionHeader || kind == UICollectionView.elementKindSectionFooter else {
+                return nil
+            }
+
+            // Identify section via currentSectionMap for O(1) lookup and guaranteed
+            // consistency with the layout provider (both read the same source of truth).
             guard let self = self,
                   let identifier = self.dataSource.sectionIdentifier(at: indexPath.section),
-                  let section = self.dataSource.snapshot().sectionIdentifiers.first(where: { $0.identifier.uniqueId == identifier })
-            else { return nil }
-            
-            if kind == UICollectionView.elementKindSectionHeader, let header = section.header {
-                 return header.dequeue(collectionView, indexPath)
-            } else if kind == UICollectionView.elementKindSectionFooter, let footer = section.footer {
-                 return footer.dequeue(collectionView, indexPath)
+                  let section = self.currentSectionMap[identifier]
+            else {
+                return self?.fallbackSupplementary(
+                    in: collectionView,
+                    kind: kind,
+                    at: indexPath
+                )
             }
             
-            return nil
+            if kind == UICollectionView.elementKindSectionHeader,
+               let header = section.header,
+               !header.isHidden {
+                return header.dequeue(collectionView, indexPath)
+            }
+
+            if kind == UICollectionView.elementKindSectionFooter,
+               let footer = section.footer,
+               !footer.isHidden {
+                return footer.dequeue(collectionView, indexPath)
+            }
+
+            return self.fallbackSupplementary(
+                in: collectionView,
+                kind: kind,
+                at: indexPath
+            )
+            
         }
         
         return ds
@@ -135,7 +185,14 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
         
         let activeLayout: UICollectionViewLayout
         if !hasInitializedLayout {
-            // Create layout once — the provider closure reads from currentSectionMap
+            // Create layout once — the provider closure reads from currentSectionMap.
+            // Boundary supplementary items are NEVER removed based on isHidden.
+            // Instead, the supplementaryViewProvider returns a zero-height EmptySupplementaryView
+            // when hidden, allowing the layout structure to stay stable across visibility changes.
+            // This avoids recreating the layout (which disrupts visibleItemsInvalidationHandler,
+            // zIndex, orthogonalScrollingBehavior, etc.) and avoids the iOS 16 bug where
+            // UICollectionViewCompositionalLayout caches section layouts aggressively and
+            // does not re-invoke the section provider after invalidateLayout().
             let layout = UICollectionViewCompositionalLayout { [weak self] index, _ in
                 guard let self = self,
                       let sect = self.dataSource.sectionIdentifier(at: index) else { return nil }
@@ -153,12 +210,14 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
                         sectionLayout.decorationItems = []
                         sectionLayout.boundarySupplementaryItems = []
                     } else {
-                        // Filter hidden or missing headers/footers
+                        // Only remove boundary items for headers/footers that don't exist at all.
+                        // Hidden headers/footers keep their boundary item so the supplementary
+                        // provider is always called — it returns a zero-height fallback view.
                         sectionLayout.boundarySupplementaryItems = sectionLayout.boundarySupplementaryItems.filter { item in
                             if item.elementKind == UICollectionView.elementKindSectionHeader {
-                                return sectionController.header != nil && !(sectionController.header?.isHidden ?? false)
+                                return sectionController.header != nil
                             } else if item.elementKind == UICollectionView.elementKindSectionFooter {
-                                return sectionController.footer != nil && !(sectionController.footer?.isHidden ?? false)
+                                return sectionController.footer != nil
                             }
                             return true
                         }
@@ -195,7 +254,10 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
             activeLayout.register(CustomBackgroundReusableView.self, forDecorationViewOfKind: kind)
         }
         
-        // Apply data changes (smart incremental diffing)
+        // Apply data changes (smart incremental diffing).
+        // When isHidden changes, DataSource.display() detects the change and calls
+        // reloadSections, which causes UIKit to re-request supplementary views from the
+        // supplementaryViewProvider — swapping between the real header and the zero-height fallback.
         dataSource.display(sections)
     }
     
