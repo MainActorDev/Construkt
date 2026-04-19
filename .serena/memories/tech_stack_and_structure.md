@@ -1,1 +1,0 @@
-Tech stack: Swift (Package.swift specifies swift-tools-version 5.9, iOS 14+), UIKit-centric framework code. Repo structure: `Sources/Construkt/Core` (Builder, Reactive, Runtime, Extensions), `Sources/Construkt/Components` (views, collection/shimmer), `Sources/Construkt/Navigation`, and `Tests`. Runtime core files live in `Sources/Construkt/Core/Runtime`.

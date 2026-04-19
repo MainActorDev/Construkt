@@ -22,7 +22,7 @@ struct HomeNavigationBar: ViewBuilder {
             
             // Navbar Content
             CustomNavigationBar(
-                customTitle: LabelView("LUMIERE")
+                customTitle: LabelView("LUMINA")
                     .font(.systemFont(ofSize: 24, weight: .bold))
                     .padding(insets: .init(top: 0, left: 4, bottom: 0, right: 0))
                     .color(bind: isLoading.map { isLoading in

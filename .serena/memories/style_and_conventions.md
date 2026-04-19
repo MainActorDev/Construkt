@@ -1,1 +1,0 @@
-Conventions: declarative UI composition with Construkt types (`VStackView`, `LabelView`, etc.), reactive state via `@Variable`, `Property`, and `Signal`, and runtime features via `FeatureSpec` with pure `reduce` + async effect execution. Keep reducer pure/synchronous, move side effects into effect executor, and prefer typed intents/effects/outputs.
