@@ -56,7 +56,8 @@ final class AppCoordinator: BaseCoordinator, RouteHandlingCoordinator {
         
         // Setup Profile Tab
         profileCoordinator.start()
-        profileNav.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person.crop.circle"), selectedImage: UIImage(systemName: "person.crop.circle.fill"))
+        profileNav.tabBarItem = UITabBarItem(title: ProfileView.tabBarTitle, image: UIImage(systemName: "person.crop.circle"), selectedImage: UIImage(systemName: "person.crop.circle.fill"))
+        profileNav.tabBarItem.accessibilityIdentifier = ProfileView.tabBarAccessibilityIdentifier
        
         tabBarController.viewControllers = [homeNav, exploreNav, profileNav]
         

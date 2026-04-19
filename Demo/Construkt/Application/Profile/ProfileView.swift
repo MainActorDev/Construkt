@@ -17,6 +17,9 @@ enum ProfileSection: String, SectionConfigIdentifier {
 }
 
 struct ProfileView: ViewConvertable {
+    static let navigationTitle = "Account"
+    static let tabBarTitle = "Account"
+    static let tabBarAccessibilityIdentifier = "tab_account"
     
     // MARK: - Body
     
