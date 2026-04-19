@@ -105,8 +105,6 @@ struct HomeView: ViewConvertable {
         .margins(bottom: 100)
         .onHostDidLoad {
             store.loadHomeData()
-            // Show walkthrough after data loads
-            showWalkthrough()
         }
         .onHostWillAppear { [handles, autoscrollController] _ in
             let totalItems = handles.collectionView?.numberOfItems(inSection: autoscrollController.currentSection) ?? 0
@@ -125,7 +123,6 @@ struct HomeView: ViewConvertable {
             AnyCell(movie, id: "hero-\(movie.id)") { movie in
                 Modified(HeroContentView()) { view in
                     view.configure(with: movie)
-                    view.accessibilityIdentifier = WalkthroughStepId.hero
                 }
             }
         }
@@ -165,7 +162,7 @@ struct HomeView: ViewConvertable {
             id: HomeSection.categories,
             items: store.genres,
             header: Header {
-                StandardHeader(title: "Genres", actionTitle: nil, sectionId: WalkthroughStepId.genres)
+                StandardHeader(title: "Genres", actionTitle: nil)
             }
         ) { genre in
             AnyCell(genre, id: "genre-\(genre.id)") { genre in
@@ -198,7 +195,7 @@ struct HomeView: ViewConvertable {
             id: HomeSection.popular,
             items: store.popularSectionMovies,
             header: Header {
-                StandardHeader(title: "Popular Now", actionTitle: "See All", sectionId: WalkthroughStepId.popular)
+                StandardHeader(title: "Popular Now", actionTitle: "See All")
             }
         ) { movie in
             AnyCell(movie, id: "popular-\(movie.id)") { movie in
@@ -229,7 +226,7 @@ struct HomeView: ViewConvertable {
             id: HomeSection.upcoming,
             items: store.upcomingMovies.map { $0.asRenderItems() },
             header: Header {
-                StandardHeader(title: "Upcoming", actionTitle: "See All", sectionId: WalkthroughStepId.upcoming)
+                StandardHeader(title: "Upcoming", actionTitle: "See All")
             }
         ) { item in
             AnyCell(item, id: "upcoming-\(String(describing: item))") { item in
@@ -277,89 +274,6 @@ struct HomeView: ViewConvertable {
             TopRatedCell(index: 0, movie: .placeholder)
         }
     }
-    
-    // MARK: - Walkthrough
-    
-    private enum WalkthroughStepId {
-        static let hero = "walkthrough-hero"
-        static let genres = "walkthrough-genres"
-        static let popular = "walkthrough-popular"
-        static let upcoming = "walkthrough-upcoming"
-        static let topRated = "walkthrough-topRated"
-    }
-    
-    private var walkthroughSteps: [WalkthroughStep] {
-        guard let cv = handles.collectionView else { return [] }
-        return [
-            WalkthroughStep(
-                target: .view(id: WalkthroughStepId.hero),
-                title: "Now Playing",
-                description: "Swipe through movies currently playing in theaters. Tap any poster to see details.",
-                tooltipPosition: .below,
-                spotlightPadding: 0,
-                prepare: {
-                    await MainActor.run {  [weak handles] in
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: true)
-                    }
-                }
-            ),
-            WalkthroughStep(
-                target: .collectionViewSection(collectionView: cv, sectionIndex: 1),
-                title: "Genres",
-                description: "Browse movies by genre. Tap a category to explore its entire catalog.",
-                tooltipPosition: .below,
-                prepare: {
-                    await MainActor.run {  [weak handles] in
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 1), at: .centeredVertically, animated: true)
-                    }
-                }
-            ),
-            WalkthroughStep(
-                target: .collectionViewSection(collectionView: cv, sectionIndex: 2),
-                title: "Popular Now",
-                description: "Discover what's trending. Tap \"See All\" for the full list.",
-                tooltipPosition: .below,
-                prepare: {
-                    await MainActor.run { [weak handles] in
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 2), at: .centeredVertically, animated: true)
-                    }
-                }
-            ),
-            WalkthroughStep(
-                target: .collectionViewSection(collectionView: cv, sectionIndex: 3),
-                title: "Upcoming",
-                description: "Stay ahead of the curve with upcoming releases.",
-                tooltipPosition: .above,
-                prepare: {
-                    await MainActor.run { [weak handles] in
-                        handles?.collectionView?.scrollToItem(at: IndexPath(item: 0, section: 3), at: .centeredVertically, animated: true)
-                    }
-                }
-            ),
-        ]
-    }
-    
-    private func showWalkthrough() {
-        guard !UserDefaults.standard.bool(forKey: "walkthrough_shown") else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            guard let window = UIApplication.shared.firstKeyWindow else { return }
-            
-            let overlay = WalkthroughOverlayView(
-                steps: walkthroughSteps,
-                onDismiss: {
-                    UserDefaults.standard.set(true, forKey: "walkthrough_shown")
-                })
-            overlay.translatesAutoresizingMaskIntoConstraints = false
-            window.addSubview(overlay)
-            NSLayoutConstraint.activate([
-                overlay.topAnchor.constraint(equalTo: window.topAnchor),
-                overlay.bottomAnchor.constraint(equalTo: window.bottomAnchor),
-                overlay.leadingAnchor.constraint(equalTo: window.leadingAnchor),
-                overlay.trailingAnchor.constraint(equalTo: window.trailingAnchor),
-            ])
-        }
-    }
-    
     
     // MARK: - Handlers
     

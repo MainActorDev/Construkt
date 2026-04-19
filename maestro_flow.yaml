@@ -1,0 +1,4 @@
+appId: com.mainactordev.Construkt
+---
+- launchApp
+- tapOn: "Movie"
