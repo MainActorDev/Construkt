@@ -20,7 +20,7 @@ final class ScreenFactory: ScreenFactoryProtocol {
         case .search:
             return SearchViewController()
         case .profile:
-            return ProfileView().toPresentable()
+            return HomeView().toPresentable()
         case .movieDetail(let id):
             let movie = Movie(id: id)
             return MovieDetailView(movie: movie).toPresentable(trackingLabel: "Movie Detail")
