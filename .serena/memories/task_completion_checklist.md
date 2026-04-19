@@ -1,1 +1,0 @@
-When finishing changes in this repo, run `swift test` (and `swift build` if structural/package changes were made). Ensure runtime and reactive behaviors remain deterministic, and confirm no navigation/runtime API regressions where relevant.
