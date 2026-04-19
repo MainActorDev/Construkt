@@ -1,0 +1,7 @@
+appId: com.mainactordev.Construkt
+---
+- tapOn:
+    text: "Account"
+    retryTapIfNoChange: true
+    waitToSettleTimeoutMs: 3000
+- waitForAnimationToEnd

@@ -1,0 +1,14 @@
+appId: com.mainactordev.Construkt
+---
+- launchApp
+- startRecording: lios_navigation
+- waitForAnimationToEnd
+
+- tapOn:
+    text: "Account"
+    retryTapIfNoChange: true
+    waitToSettleTimeoutMs: 3000
+- waitForAnimationToEnd
+
+- takeScreenshot: lios_final_state
+- stopRecording
