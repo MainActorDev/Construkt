@@ -1,0 +1,23 @@
+{
+  "permission": {
+    "bash": {
+      "rm *": "deny",
+      "*": "ask"
+    },
+    "edit": {
+      "*": "allow"
+    }
+  },
+  "mcpServers": {
+    "FigmaMCP": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "github:glips/figma-context-mcp"
+      ],
+      "env": {
+        "FIGMA_ACCESS_TOKEN": "figd_kIKD7LdS_VrcjtGUMguRCk24NwXTNbTZoyvF1VrF"
+      }
+    }
+  }
+}
