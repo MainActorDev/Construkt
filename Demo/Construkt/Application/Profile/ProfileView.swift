@@ -30,6 +30,7 @@ struct ProfileView: ViewConvertable {
                 versionSection
             }
         }
+        .navigation(title: "Account")
         .backgroundColor(UIColor("#0A0A0A"))
         .asViews()
     }
