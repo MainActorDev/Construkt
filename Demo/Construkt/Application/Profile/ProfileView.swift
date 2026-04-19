@@ -17,6 +17,7 @@ enum ProfileSection: String, SectionConfigIdentifier {
 }
 
 struct ProfileView: ViewConvertable {
+    static let navigationTitle = "Account"
     
     // MARK: - Body
     

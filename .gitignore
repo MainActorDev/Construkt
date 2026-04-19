@@ -25,3 +25,6 @@ construkt-ai/
 .agents/
 ui-references/
 cleanup_branches.sh
+
+# Lios-Agent Execution Payloads
+opencode.json
