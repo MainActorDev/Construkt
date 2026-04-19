@@ -25,3 +25,5 @@ construkt-ai/
 .agents/
 ui-references/
 cleanup_branches.sh
+
+.serena/
