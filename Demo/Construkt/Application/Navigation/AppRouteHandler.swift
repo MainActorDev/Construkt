@@ -29,13 +29,7 @@ final class AppRouteHandler: ConstruktRouteHandler<AppRoute> {
         let exploreScreen = makeExploreViewController()
         exploreNav.viewControllers = [exploreScreen.toPresentable()]
         
-        // Setup Profile Tab
-        let profileNav = NavigationController()
-        profileNav.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person.crop.circle"), selectedImage: UIImage(systemName: "person.crop.circle.fill"))
-        let profileScreen = makeProfileViewController()
-        profileNav.viewControllers = [profileScreen.toPresentable()]
-        
-        tabBarController.viewControllers = [homeNav, exploreNav, profileNav]
+        tabBarController.viewControllers = [homeNav, exploreNav]
         
         // Styling TabBar
         let appearance = UITabBarAppearance()
@@ -64,6 +58,8 @@ final class AppRouteHandler: ConstruktRouteHandler<AppRoute> {
             switchToTab(.home)
         case .explore, .search:
             switchToTab(.explore)
+        case .profile:
+            switchToTab(.home)
         case .movieDetail, .movieList, .web:
             if let selectedNav = activeNavigationController(for: tabBarController) {
                 let proxyRouter = DefaultRouter(navigationController: selectedNav)
@@ -158,7 +154,4 @@ final class AppRouteHandler: ConstruktRouteHandler<AppRoute> {
         ExploreView().toPresentable()
     }
     
-    private func makeProfileViewController() -> ConstruktPresentable {
-        return ProfileView().toPresentable()
-    }
 }

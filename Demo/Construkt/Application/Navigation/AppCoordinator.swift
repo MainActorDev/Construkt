@@ -5,7 +5,6 @@ import ConstruktKit
 enum AppTab: Int {
     case home = 0
     case explore = 1
-    case profile = 2
 }
 
 @available(iOS 15.0, *)
@@ -49,16 +48,7 @@ final class AppCoordinator: BaseCoordinator, RouteHandlingCoordinator {
         exploreCoordinator.start()
         exploreNav.tabBarItem = UITabBarItem(title: "Explore", image: UIImage(systemName: "magnifyingglass"), selectedImage: UIImage(systemName: "text.magnifyingglass"))
         
-        let profileNav = NavigationController()
-        let profileRouter = DefaultRouter(navigationController: profileNav)
-        let profileCoordinator = ProfileCoordinator(router: profileRouter, factory: factory)
-        store(profileCoordinator)
-        
-        // Setup Profile Tab
-        profileCoordinator.start()
-        profileNav.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person.crop.circle"), selectedImage: UIImage(systemName: "person.crop.circle.fill"))
-       
-        tabBarController.viewControllers = [homeNav, exploreNav, profileNav]
+        tabBarController.viewControllers = [homeNav, exploreNav]
         
         // Styling TabBar roughly (can refine later with custom subclass)
         let appearance = UITabBarAppearance()
@@ -85,7 +75,7 @@ final class AppCoordinator: BaseCoordinator, RouteHandlingCoordinator {
         case .explore, .search:
             switchToTab(.explore)
         case .profile:
-            switchToTab(.profile)
+            switchToTab(.home)
         case .movieDetail:
             let screen = factory.makeScreen(for: route)
             router.push(screen, animated: true, hideTabBar: true, receiver: self)
