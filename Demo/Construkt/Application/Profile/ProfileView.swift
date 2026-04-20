@@ -30,8 +30,29 @@ struct ProfileView: ViewConvertable {
                 versionSection
             }
         }
+        .navigationBar {
+            headerOverlay
+        }
         .backgroundColor(UIColor("#0A0A0A"))
         .asViews()
+    }
+
+    private var headerOverlay: View {
+        ZStackView {
+            BlurView(style: .dark)
+            HStackView {
+                LabelView("Account")
+                    .font(.systemFont(ofSize: 32, weight: .semibold))
+                    .color(.white)
+                SpacerView()
+            }
+            .padding(insets: .init(top: 12, left: 24, bottom: 12, right: 24))
+        }
+        .border(color: UIColor(white: 1.0, alpha: 0.05), lineWidth: 1)
+        .height(48)
+        .safeArea(false)
+        .zIndex(1000)
+        .position(.top)
     }
     
     // MARK: - Sections

@@ -1,0 +1,8 @@
+appId: com.mainactordev.Construkt
+---
+- startRecording: lios_navigation
+- tapOn: 
+    id: "tab_account"
+
+- takeScreenshot: lios_final_state
+- stopRecording
