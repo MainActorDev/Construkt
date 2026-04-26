@@ -30,8 +30,9 @@ public enum FlowLayoutCalculator {
         for size in itemSizes {
             let itemWidth = min(size.width, containerWidth)
 
-            // Wrap to next line if item doesn't fit (unless line is empty)
-            if currentX > 0 && currentX + horizontalSpacing + itemWidth > containerWidth {
+            // Wrap to next line if item doesn't fit (unless line is empty).
+            // Note: currentX already includes horizontalSpacing from the previous item.
+            if currentX > 0 && currentX + itemWidth > containerWidth {
                 currentY += lineHeight + lineSpacing
                 currentX = 0
                 lineHeight = 0
