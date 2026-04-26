@@ -85,6 +85,30 @@ public struct ReduceResult<Effect: Sendable, Output: Sendable>: Sendable {
     }
 }
 
+// MARK: - ReduceResult Composition
+
+extension ReduceResult {
+    /// Transforms effects and outputs into different types.
+    /// Used to embed a child feature's reduce result into a parent.
+    ///
+    /// ```swift
+    /// let childResult = ChildFeature.reduce(state: &state.child, intent: childIntent)
+    /// return childResult.map(
+    ///     effect: { ParentEffect.child($0) },
+    ///     output: { ParentOutput.child($0) }
+    /// )
+    /// ```
+    public func map<NewEffect: Sendable, NewOutput: Sendable>(
+        effect: (Effect) -> NewEffect,
+        output: (Output) -> NewOutput
+    ) -> ReduceResult<NewEffect, NewOutput> {
+        ReduceResult<NewEffect, NewOutput>(
+            effects: effects.map(effect),
+            outputs: outputs.map(output)
+        )
+    }
+}
+
 /// Result returned by effect execution.
 ///
 /// - `intents`: fed back into the runtime reducer loop.
