@@ -44,7 +44,7 @@ public final class RouteChannel<Event> {
     /// RouteChannel<SheetEvent>.shared.send(.didSelectItem(item), sender: view)
     /// ```
     nonisolated public static var shared: RouteChannel<Event> {
-        MainActor.assumeIsolated {
+        let resolve: @MainActor () -> RouteChannel<Event> = {
             let key = ObjectIdentifier(Event.self)
             if let existing = SharedChannelRegistry.channels[key] as? RouteChannel<Event> {
                 return existing
@@ -52,6 +52,17 @@ public final class RouteChannel<Event> {
             let channel = RouteChannel<Event>()
             SharedChannelRegistry.channels[key] = channel
             return channel
+        }
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated {
+                resolve()
+            }
+        } else {
+            return DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    resolve()
+                }
+            }
         }
     }
 

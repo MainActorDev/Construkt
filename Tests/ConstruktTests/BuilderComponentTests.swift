@@ -86,6 +86,37 @@ struct StackViewTests {
         #expect(stack.axis == .vertical)
     }
     
+    @Test("HStackView spacing initializer applies spacing")
+    func testHStackSpacingInit() {
+        let stack = HStackView(spacing: 24) {
+            LabelView("A")
+            LabelView("B")
+        }.build() as! UIStackView
+        
+        #expect(stack.spacing == 24)
+        #expect(stack.arrangedSubviews.count == 2)
+    }
+    
+    @Test("VStackView spacing initializer applies spacing")
+    func testVStackSpacingInit() {
+        let stack = VStackView(spacing: 16) {
+            LabelView("A")
+            LabelView("B")
+        }.build() as! UIStackView
+        
+        #expect(stack.spacing == 16)
+        #expect(stack.arrangedSubviews.count == 2)
+    }
+    
+    @Test("HStackView zero spacing overrides system default")
+    func testHStackZeroSpacing() {
+        let stack = HStackView(spacing: 0) {
+            LabelView("A")
+        }.build() as! UIStackView
+        
+        #expect(stack.spacing == 0)
+    }
+    
     @Test("Modifiers applied to stack components")
     func testModifiers() {
         let stack = VStackView {}
@@ -97,6 +128,60 @@ struct StackViewTests {
         #expect(stack.spacing == 12)
         #expect(stack.alignment == .trailing)
         #expect(stack.distribution == .fillProportionally)
+    }
+}
+
+@Suite("UIControl Modifiers") @MainActor
+struct UIControlModifierTests {
+    @Test("enabled modifier sets isEnabled")
+    func testEnabledModifier() {
+        let button = ButtonView("Test")
+            .enabled(false)
+            .build() as! UIButton
+        
+        #expect(button.isEnabled == false)
+    }
+    
+    @Test("highlighted modifier sets isHighlighted, not isEnabled")
+    func testHighlightedModifier() {
+        let button = ButtonView("Test")
+            .highlighted(true)
+            .build() as! UIButton
+        
+        #expect(button.isHighlighted == true)
+        // Verify it didn't accidentally set isEnabled instead
+        #expect(button.isEnabled == true)
+    }
+    
+    @Test("selected modifier sets isSelected, not isEnabled")
+    func testSelectedModifier() {
+        let button = ButtonView("Test")
+            .selected(true)
+            .build() as! UIButton
+        
+        #expect(button.isSelected == true)
+        // Verify it didn't accidentally set isEnabled instead
+        #expect(button.isEnabled == true)
+    }
+    
+    @Test("highlighted(false) does not disable the control")
+    func testHighlightedFalseDoesNotDisable() {
+        let button = ButtonView("Test")
+            .highlighted(false)
+            .build() as! UIButton
+        
+        #expect(button.isHighlighted == false)
+        #expect(button.isEnabled == true)
+    }
+    
+    @Test("selected(false) does not disable the control")
+    func testSelectedFalseDoesNotDisable() {
+        let button = ButtonView("Test")
+            .selected(false)
+            .build() as! UIButton
+        
+        #expect(button.isSelected == false)
+        #expect(button.isEnabled == true)
     }
 }
 
