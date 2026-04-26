@@ -64,12 +64,12 @@ public struct ImageView: ModifiableView {
         }
     }
 
-    /// Initializes an image view tightly bound to an Rx stream of images.
+    /// Initializes an image view tightly bound to a reactive stream of images.
     public init<Binding:ViewBinding>(_ image: Binding) where Binding.Value == UIImage {
         self.image(bind: image)
     }
 
-    /// Initializes an image view tightly bound to an Rx stream of optional images.
+    /// Initializes an image view tightly bound to a reactive stream of optional images.
     public init<Binding:ViewBinding>(_ image: Binding) where Binding.Value == UIImage? {
         self.image(bind: image)
     }
@@ -94,13 +94,13 @@ extension ModifiableView where Base: UIImageView {
 
 extension ModifiableView where Base: UIImageView {
 
-    /// Dynamically binds the `image` property to an upstream Rx sequence.
+    /// Dynamically binds the `image` property to an upstream reactive sequence.
     @discardableResult
     public func image<Binding:ViewBinding>(bind binding: Binding) -> ViewModifier<Base> where Binding.Value == UIImage {
         ViewModifier(modifiableView, binding: binding) { $0.view.image = $0.value }
     }
 
-    /// Dynamically binds the `image` property to an upstream Rx sequence of optional images.
+    /// Dynamically binds the `image` property to an upstream reactive sequence of optional images.
     @discardableResult
     public func image<Binding:ViewBinding>(bind binding: Binding) -> ViewModifier<Base> where Binding.Value == UIImage? {
         ViewModifier(modifiableView, binding: binding) { $0.view.image = $0.value }

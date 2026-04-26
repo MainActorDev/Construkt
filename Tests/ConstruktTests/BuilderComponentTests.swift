@@ -185,6 +185,83 @@ struct UIControlModifierTests {
     }
 }
 
+@Suite("View Identifier & Tag Overloads") @MainActor
+struct ViewIdentifierOverloadTests {
+    @Test("accessibilityIdentifier with plain String")
+    func testAccessibilityIdentifierString() {
+        let view = UIView()
+            .accessibilityIdentifier("login_button")
+            .build()
+        
+        #expect(view.accessibilityIdentifier == "login_button")
+    }
+    
+    @Test("identifier with plain String")
+    func testIdentifierString() {
+        let view = UIView()
+            .identifier("submit_field")
+            .build()
+        
+        #expect(view.accessibilityIdentifier == "submit_field")
+    }
+    
+    @Test("tag with plain Int")
+    func testTagInt() {
+        let view = UIView()
+            .tag(42)
+            .build()
+        
+        #expect(view.tag == 42)
+    }
+}
+
+@Suite("Gesture Modifiers") @MainActor
+struct GestureModifierTests {
+    @Test("onSwipeUp adds swipe gesture recognizer with up direction")
+    func testSwipeUp() {
+        let view = UIView()
+            .onSwipeUp { _ in }
+            .build()
+        
+        let swipeGestures = view.gestureRecognizers?.compactMap { $0 as? UISwipeGestureRecognizer } ?? []
+        #expect(swipeGestures.count == 1)
+        #expect(swipeGestures.first?.direction == .up)
+    }
+    
+    @Test("onSwipeDown adds swipe gesture recognizer with down direction")
+    func testSwipeDown() {
+        let view = UIView()
+            .onSwipeDown { _ in }
+            .build()
+        
+        let swipeGestures = view.gestureRecognizers?.compactMap { $0 as? UISwipeGestureRecognizer } ?? []
+        #expect(swipeGestures.count == 1)
+        #expect(swipeGestures.first?.direction == .down)
+    }
+    
+    @Test("onSwipeLeft adds swipe gesture recognizer with left direction")
+    func testSwipeLeft() {
+        let view = UIView()
+            .onSwipeLeft { _ in }
+            .build()
+        
+        let swipeGestures = view.gestureRecognizers?.compactMap { $0 as? UISwipeGestureRecognizer } ?? []
+        #expect(swipeGestures.count == 1)
+        #expect(swipeGestures.first?.direction == .left)
+    }
+    
+    @Test("onSwipeRight adds swipe gesture recognizer with right direction")
+    func testSwipeRight() {
+        let view = UIView()
+            .onSwipeRight { _ in }
+            .build()
+        
+        let swipeGestures = view.gestureRecognizers?.compactMap { $0 as? UISwipeGestureRecognizer } ?? []
+        #expect(swipeGestures.count == 1)
+        #expect(swipeGestures.first?.direction == .right)
+    }
+}
+
 @Suite("SwitchView") @MainActor
 struct SwitchViewTests {
     @Test("isOn initialization configures state")

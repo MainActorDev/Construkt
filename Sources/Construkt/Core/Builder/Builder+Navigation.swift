@@ -53,7 +53,7 @@ extension ModifiableView {
 
 }
 
-/// Extends `UIBarButtonItem` to support modern, declarative initialization and Rx click bindings.
+/// Extends `UIBarButtonItem` to support modern, declarative initialization and reactive click bindings.
 extension UIBarButtonItem {
 
     /// Creates a bar button item with a standard system item icon.

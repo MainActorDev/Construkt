@@ -28,7 +28,7 @@ import UIKit
 
 
 /// A builder component that wraps a `UIButton`, providing declarative methods for titles, colors, fonts,
-/// and RxSwift tap handlers.
+/// and reactive tap handlers.
 public struct ButtonView: ModifiableView {
     
     public let modifiableView = Modified(UIButton()) {
@@ -102,7 +102,7 @@ extension ModifiableView where Base: UIButton {
         ViewModifier(modifiableView) { $0.titleLabel?.font = .preferredFont(forTextStyle: style) }
     }
 
-    /// Attaches an `RxSwift` tap handler to the button, automatically throttled to prevent double taps.
+    /// Attaches a reactive tap handler to the button, automatically throttled to prevent double taps.
     ///
     /// - Parameter handler: A closure providing the builder context for contextual access.
     /// Assigns a native execution block directly binding towards `touchUpInside` tap events.

@@ -38,7 +38,7 @@ public struct BuilderSwipeGestureContext<Base:UIView>: ViewBuilderContextProvide
     public var gesture: UISwipeGestureRecognizer
 }
 
-/// Provides declarative Rx-powered gesture recognizers (e.g., taps, swipes) for all builder views.
+/// Provides declarative gesture recognizers (e.g., taps, swipes) for all builder views.
 extension ModifiableView {
 
     /// Adds a tap gesture recognizer to the view, enabling interaction.
@@ -92,6 +92,46 @@ extension ModifiableView {
         ViewModifier(modifiableView) { view in
             let gesture = UISwipeGestureRecognizer()
             gesture.direction = .right
+            view.addGestureRecognizer(gesture)
+            view.isUserInteractionEnabled = true
+            
+            let target = NativeGestureTarget(gesture: gesture) { [weak view, weak gesture] _ in
+                guard let view = view, let gesture = gesture else { return }
+                handler(BuilderSwipeGestureContext(view: view, gesture: gesture))
+            }
+            view.cancelBag.insert(target)
+        }
+    }
+
+    /// Adds a swipe up gesture recognizer to the view.
+    ///
+    /// - Parameter handler: A closure to execute when the gesture is recognized.
+    /// - Returns: A modified view wrapper.
+    @discardableResult
+    public func onSwipeUp(_ handler: @escaping (_ context: BuilderSwipeGestureContext<Base>) -> Void) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { view in
+            let gesture = UISwipeGestureRecognizer()
+            gesture.direction = .up
+            view.addGestureRecognizer(gesture)
+            view.isUserInteractionEnabled = true
+            
+            let target = NativeGestureTarget(gesture: gesture) { [weak view, weak gesture] _ in
+                guard let view = view, let gesture = gesture else { return }
+                handler(BuilderSwipeGestureContext(view: view, gesture: gesture))
+            }
+            view.cancelBag.insert(target)
+        }
+    }
+
+    /// Adds a swipe down gesture recognizer to the view.
+    ///
+    /// - Parameter handler: A closure to execute when the gesture is recognized.
+    /// - Returns: A modified view wrapper.
+    @discardableResult
+    public func onSwipeDown(_ handler: @escaping (_ context: BuilderSwipeGestureContext<Base>) -> Void) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { view in
+            let gesture = UISwipeGestureRecognizer()
+            gesture.direction = .down
             view.addGestureRecognizer(gesture)
             view.isUserInteractionEnabled = true
             

@@ -169,6 +169,24 @@ extension ModifiableView {
         ViewModifier(modifiableView) { $0.tag = tag.rawValue }
     }
 
+    /// Sets an accessibility identifier for UI testing using a plain string.
+    @discardableResult
+    public func accessibilityIdentifier(_ id: String) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { $0.accessibilityIdentifier = id }
+    }
+
+    /// Sets the view's accessibility identifier using a plain string.
+    @discardableResult
+    public func identifier(_ id: String) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { $0.accessibilityIdentifier = id }
+    }
+
+    /// Associates a specific integer identifier to rapidly retrieve this specific subview instance.
+    @discardableResult
+    public func tag(_ tag: Int) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { $0.tag = tag }
+    }
+
     @discardableResult
     public func tintColor(_ color: UIColor) -> ViewModifier<Base> {
         ViewModifier(modifiableView, keyPath: \.tintColor, value: color)

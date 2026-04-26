@@ -15,7 +15,7 @@ public protocol AnyCancellableLifecycle {
 
 /// The fundamental protocol for agnostic reactive data flows in Construkt.
 /// Allows components to observe structural property changes without forcing a dependency 
-/// on heavy external frameworks like RxSwift or Combine.
+/// on heavy external frameworks like Combine.
 public protocol ViewBinding {
     associatedtype Value
     
