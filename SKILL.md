@@ -43,6 +43,8 @@ When generating UI, use the Construkt primitives:
 | `BlurView` / `UIVisualEffectView` | `BlurView(style: .regular)` |
 | `List` / `UITableView` | `TableView(DynamicItemViewBuilder) { ... }` |
 | `LazyVGrid`/`UICollectionView` | `CollectionView { AnySection { ... } }` |
+| Flow/tag cloud layout | `.layout { CollectionLayoutSectionBuilder.flow(itemSizes:) }` |
+| Custom collection layout | `CollectionView { ... }.customLayout(myLayout)` |
 | Screen layout container | `Screen { content }.navigationBar { bar }` |
 
 ---
@@ -192,7 +194,70 @@ CollectionView {
 }
 ```
 
-### 3. Shimmer Loading States
+### 3. Flow Layouts (Tag Clouds / Chip Lists)
+For variable-width items that wrap to the next line, use the `.flow()` layout factory on `CollectionLayoutSectionBuilder`. This works within the standard compositional layout — other sections can use `.list()`, `.grid()`, or `.carousel()` as usual.
+
+```swift
+AnySection(id: "tags", items: tags) { tag in
+    AnyCell(tag, id: tag.id) { tag in
+        TagChipCell(tag: tag)
+    }
+}
+.layout {
+    CollectionLayoutSectionBuilder.flow(
+        itemSizes: tags.map { $0.chipSize }, // Pre-measured [CGSize]
+        horizontalSpacing: 8,
+        lineSpacing: 8
+    )
+    .insets(top: 16, leading: 16, bottom: 16, trailing: 16)
+}
+```
+
+> **Important:** You must pre-measure item sizes before passing them to `.flow()`. The layout calculator needs widths upfront to compute wrapping positions.
+
+### 4. Custom Collection View Layouts
+For layouts that can't be expressed with compositional layout, bypass it entirely with `.customLayout()`:
+
+```swift
+let flowLayout = UICollectionViewFlowLayout()
+flowLayout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+
+CollectionView {
+    AnySection(id: "items") { ... }
+}
+.customLayout(flowLayout)
+```
+
+When `.customLayout()` is set, per-section `.layout {}` modifiers are ignored — the custom layout governs the entire collection view.
+
+For custom layouts that need Construkt's section/item metadata, conform to `ConstruktCollectionLayout`:
+
+```swift
+class MyLayout: UICollectionViewLayout, ConstruktCollectionLayout {
+    private var metadata: CollectionLayoutMetadata?
+
+    func updateMetadata(_ metadata: CollectionLayoutMetadata) {
+        self.metadata = metadata
+        invalidateLayout()
+    }
+    // implement prepare(), layoutAttributesForElements(in:), etc.
+}
+```
+
+Construkt includes a built-in `FlowCollectionViewLayout` for wrapping flow layouts:
+
+```swift
+let flowLayout = FlowCollectionViewLayout { indexPath, metadata in
+    return CGSize(width: computedWidth, height: 32)
+}
+flowLayout.horizontalSpacing = 8
+flowLayout.sectionInsets = NSDirectionalEdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+
+CollectionView { ... }
+    .customLayout(flowLayout)
+```
+
+### 5. Shimmer Loading States
 Construkt supports natively swapping an entire `AnySection` with shimmer placeholders during load times. Use the `.shimmer(count:when:...)` modifier directly on the Section:
 
 ```swift
@@ -537,6 +602,8 @@ ZStackView { ... }.hideKeyboardOnBackgroundTap()
 3. **Never write `setupConstraints()` or use `translatesAutoresizingMaskIntoConstraints = false`.**
 4. **Never create generic constraint arrays.** 
 5. **Never write `UICollectionViewDataSource` logic.** Use `CollectionView` ResultBuilders.
+6. **Never implement `UICollectionViewLayout` subclasses for simple flow/wrapping layouts.** Use `.layout { CollectionLayoutSectionBuilder.flow(itemSizes:) }` instead. Only use `.customLayout()` when the layout truly can't be expressed with compositional layout.
+7. **Never use `.layout {}` modifiers on sections when `.customLayout()` is set on the `CollectionView`.** The custom layout governs the entire collection view; per-section layout providers are ignored.
 
 ---
 
