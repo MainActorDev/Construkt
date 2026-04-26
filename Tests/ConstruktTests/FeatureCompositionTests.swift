@@ -268,3 +268,229 @@ struct FeatureCompositionTests {
         #expect(mapped.outputs.isEmpty)
     }
 }
+
+// MARK: - Integration Test Fixtures
+
+private enum ChildFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var value: String = ""
+        var isLoading: Bool = false
+    }
+    enum Intent: Sendable {
+        case load
+        case loaded(String)
+    }
+    enum Effect: Sendable, Hashable {
+        case fetch
+    }
+    enum Output: Sendable {
+        case didComplete
+    }
+    struct Dependencies: Sendable {}
+
+    static var initialState: State { State() }
+
+    static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+        switch intent {
+        case .load:
+            state.isLoading = true
+            return ReduceResult(effects: [.fetch])
+        case .loaded(let value):
+            state.value = value
+            state.isLoading = false
+            return ReduceResult(outputs: [.didComplete])
+        }
+    }
+
+    static func policy(for effect: Effect) -> EffectPolicy {
+        .latest("child-fetch")
+    }
+}
+
+private enum ParentFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var child: ChildFeature.State = ChildFeature.initialState
+        var completionCount: Int = 0
+    }
+    enum Intent: Sendable {
+        case child(ChildFeature.Intent)
+        case childCompleted
+    }
+    enum Effect: Sendable, Hashable {
+        case child(ChildFeature.Effect)
+    }
+    enum Output: Sendable {
+        case childDidComplete
+    }
+    struct Dependencies: Sendable {}
+
+    static var initialState: State { State() }
+
+    static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+        switch intent {
+        case .child(let childIntent):
+            let childResult = ChildFeature.reduce(state: &state.child, intent: childIntent)
+            let result = childResult.map(
+                effect: { Effect.child($0) },
+                output: { _ in Output.childDidComplete }
+            )
+
+            // Parent observes child intent and reacts
+            if case .loaded = childIntent {
+                state.completionCount += 1
+            }
+
+            return result
+
+        case .childCompleted:
+            state.completionCount += 1
+            return .none
+        }
+    }
+
+    static func policy(for effect: Effect) -> EffectPolicy {
+        switch effect {
+        case .child(let childEffect):
+            return ChildFeature.policy(for: childEffect)
+        }
+    }
+}
+
+private actor OutputCollector {
+    var values: [ParentFeature.Output] = []
+
+    func append(_ output: ParentFeature.Output) {
+        values.append(output)
+    }
+}
+
+// MARK: - Integration Tests
+
+@Suite("Feature Composition Integration", .serialized)
+struct FeatureCompositionIntegrationTests {
+
+    @Test("Full round-trip: child intent → child reduce → child effect → feedback → parent state")
+    func fullRoundTrip() async throws {
+        let childExecutor: FeatureEffectExecutor<ChildFeature> = { effect, _ in
+            switch effect {
+            case .fetch:
+                return EffectFeedback(intents: [.loaded("test-value")])
+            }
+        }
+
+        let parentExecutor: FeatureEffectExecutor<ParentFeature> = { effect, _ in
+            switch effect {
+            case .child(let childEffect):
+                let childFeedback = try await childExecutor(childEffect, ChildFeature.Dependencies())
+                return childFeedback.map(
+                    intent: { .child($0) },
+                    output: { _ in ParentFeature.Output.childDidComplete }
+                )
+            }
+        }
+
+        let runtime = FeatureRuntime<ParentFeature>(
+            dependencies: ParentFeature.Dependencies(),
+            effectExecutor: parentExecutor
+        )
+
+        // Dispatch child intent through parent
+        await runtime.send(.child(.load))
+
+        // Wait for effect to complete
+        await runtime.waitUntilIdle()
+
+        let state = await runtime.currentState()
+
+        // Child state was updated by child reducer
+        #expect(state.child.value == "test-value")
+        #expect(state.child.isLoading == false)
+
+        // Parent observed the child .loaded intent and incremented
+        #expect(state.completionCount == 1)
+    }
+
+    @Test("Child reduce result maps effects correctly through parent")
+    func childEffectsMappedThroughParent() async throws {
+        let parentExecutor: FeatureEffectExecutor<ParentFeature> = { effect, _ in
+            switch effect {
+            case .child(let childEffect):
+                switch childEffect {
+                case .fetch:
+                    return EffectFeedback(intents: [.child(.loaded("done"))])
+                }
+            }
+        }
+
+        let runtime = FeatureRuntime<ParentFeature>(
+            dependencies: ParentFeature.Dependencies(),
+            effectExecutor: parentExecutor
+        )
+
+        await runtime.send(.child(.load))
+        await runtime.waitUntilIdle()
+
+        let state = await runtime.currentState()
+        // Child effect was executed and fed back .loaded("done")
+        #expect(state.child.value == "done")
+        #expect(state.child.isLoading == false)
+        // Parent observed .loaded intent and incremented
+        #expect(state.completionCount == 1)
+    }
+
+    @Test("Parent can react to child intents with additional state changes")
+    func parentReactsToChildIntents() async {
+        let parentExecutor: FeatureEffectExecutor<ParentFeature> = { _, _ in .none }
+
+        let runtime = FeatureRuntime<ParentFeature>(
+            dependencies: ParentFeature.Dependencies(),
+            effectExecutor: parentExecutor
+        )
+
+        // Directly send the loaded intent (simulating effect feedback)
+        await runtime.send(.child(.loaded("value")))
+
+        let state = await runtime.currentState()
+
+        // Child reducer processed it
+        #expect(state.child.value == "value")
+        #expect(state.child.isLoading == false)
+
+        // Parent observed and reacted
+        #expect(state.completionCount == 1)
+    }
+
+    @Test("Child outputs map to parent outputs")
+    func childOutputsMappedToParent() async throws {
+        let parentExecutor: FeatureEffectExecutor<ParentFeature> = { _, _ in .none }
+
+        let runtime = FeatureRuntime<ParentFeature>(
+            dependencies: ParentFeature.Dependencies(),
+            effectExecutor: parentExecutor
+        )
+
+        // Collect outputs using an actor to avoid Sendable capture issues
+        let collector = OutputCollector()
+        let outputStream = await runtime.outputStream()
+        let collectTask = Task {
+            for await output in outputStream {
+                await collector.append(output)
+            }
+        }
+
+        // .loaded triggers child output .didComplete which maps to parent .childDidComplete
+        await runtime.send(.child(.loaded("value")))
+        await runtime.waitUntilIdle()
+
+        // Give output stream time to deliver
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        collectTask.cancel()
+
+        let outputs = await collector.values
+        #expect(outputs.contains(where: {
+            if case .childDidComplete = $0 { return true }
+            return false
+        }))
+    }
+}
