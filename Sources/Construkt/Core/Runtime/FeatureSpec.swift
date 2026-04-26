@@ -135,6 +135,21 @@ extension ReduceResult {
             outputs: outputs.map(transform)
         )
     }
+
+    /// Merges effects and outputs from another result into this one.
+    ///
+    /// ```swift
+    /// let childResult = ChildFeature.reduce(state: &state.child, intent: childIntent)
+    ///     .map(effect: { .child($0) }, output: { .child($0) })
+    /// let parentExtra = ReduceResult<Effect, Output>(effects: [.trackEvent])
+    /// return childResult.merged(with: parentExtra)
+    /// ```
+    public func merged(with other: ReduceResult<Effect, Output>) -> ReduceResult<Effect, Output> {
+        ReduceResult(
+            effects: effects + other.effects,
+            outputs: outputs + other.outputs
+        )
+    }
 }
 
 /// Result returned by effect execution.
@@ -153,6 +168,58 @@ public struct EffectFeedback<Intent: Sendable, Output: Sendable>: Sendable {
     /// Convenience for effects with no feedback.
     public static var none: EffectFeedback<Intent, Output> {
         .init()
+    }
+}
+
+// MARK: - EffectFeedback Composition
+
+extension EffectFeedback {
+    /// Transforms intents and outputs into different types.
+    /// Used to embed a child feature's effect feedback into a parent.
+    ///
+    /// ```swift
+    /// let childFeedback = try await childExecutor(childEffect, deps.childDeps)
+    /// return childFeedback.map(
+    ///     intent: { ParentIntent.child($0) },
+    ///     output: { ParentOutput.child($0) }
+    /// )
+    /// ```
+    public func map<NewIntent: Sendable, NewOutput: Sendable>(
+        intent: (Intent) -> NewIntent,
+        output: (Output) -> NewOutput
+    ) -> EffectFeedback<NewIntent, NewOutput> {
+        EffectFeedback<NewIntent, NewOutput>(
+            intents: intents.map(intent),
+            outputs: outputs.map(output)
+        )
+    }
+
+    /// Maps only the intents, preserving output type.
+    ///
+    /// ```swift
+    /// childFeedback.mapIntents { ParentIntent.child($0) }
+    /// ```
+    public func mapIntents<NewIntent: Sendable>(
+        _ transform: (Intent) -> NewIntent
+    ) -> EffectFeedback<NewIntent, Output> {
+        EffectFeedback<NewIntent, Output>(
+            intents: intents.map(transform),
+            outputs: outputs
+        )
+    }
+
+    /// Maps only the outputs, preserving intent type.
+    ///
+    /// ```swift
+    /// childFeedback.mapOutputs { ParentOutput.child($0) }
+    /// ```
+    public func mapOutputs<NewOutput: Sendable>(
+        _ transform: (Output) -> NewOutput
+    ) -> EffectFeedback<Intent, NewOutput> {
+        EffectFeedback<Intent, NewOutput>(
+            intents: intents,
+            outputs: outputs.map(transform)
+        )
     }
 }
 
