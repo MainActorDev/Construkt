@@ -71,4 +71,48 @@ struct FeatureCompositionTests {
         #expect(mapped.effects.isEmpty)
         #expect(mapped.outputs == [5, 5])
     }
+
+    // MARK: - ReduceResult.mapEffects(_:)
+
+    @Test("mapEffects transforms effects, preserves output type")
+    func mapEffectsPreservesOutputs() {
+        let result = ReduceResult<Int, String>(effects: [1, 2], outputs: ["a"])
+
+        let mapped: ReduceResult<String, String> = result.mapEffects { "e-\($0)" }
+
+        #expect(mapped.effects == ["e-1", "e-2"])
+        #expect(mapped.outputs == ["a"])
+    }
+
+    @Test("mapEffects on .none returns .none equivalent")
+    func mapEffectsOnNone() {
+        let result: ReduceResult<Int, String> = .none
+
+        let mapped: ReduceResult<String, String> = result.mapEffects { "e-\($0)" }
+
+        #expect(mapped.effects.isEmpty)
+        #expect(mapped.outputs.isEmpty)
+    }
+
+    // MARK: - ReduceResult.mapOutputs(_:)
+
+    @Test("mapOutputs transforms outputs, preserves effect type")
+    func mapOutputsPreservesEffects() {
+        let result = ReduceResult<Int, String>(effects: [1], outputs: ["hello", "world"])
+
+        let mapped: ReduceResult<Int, Int> = result.mapOutputs { $0.count }
+
+        #expect(mapped.effects == [1])
+        #expect(mapped.outputs == [5, 5])
+    }
+
+    @Test("mapOutputs on .none returns .none equivalent")
+    func mapOutputsOnNone() {
+        let result: ReduceResult<Int, String> = .none
+
+        let mapped: ReduceResult<Int, Int> = result.mapOutputs { $0.count }
+
+        #expect(mapped.effects.isEmpty)
+        #expect(mapped.outputs.isEmpty)
+    }
 }

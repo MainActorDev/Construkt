@@ -107,6 +107,34 @@ extension ReduceResult {
             outputs: outputs.map(output)
         )
     }
+
+    /// Maps only the effects, preserving output type.
+    ///
+    /// ```swift
+    /// childResult.mapEffects { ParentEffect.child($0) }
+    /// ```
+    public func mapEffects<NewEffect: Sendable>(
+        _ transform: (Effect) -> NewEffect
+    ) -> ReduceResult<NewEffect, Output> {
+        ReduceResult<NewEffect, Output>(
+            effects: effects.map(transform),
+            outputs: outputs
+        )
+    }
+
+    /// Maps only the outputs, preserving effect type.
+    ///
+    /// ```swift
+    /// childResult.mapOutputs { ParentOutput.child($0) }
+    /// ```
+    public func mapOutputs<NewOutput: Sendable>(
+        _ transform: (Output) -> NewOutput
+    ) -> ReduceResult<Effect, NewOutput> {
+        ReduceResult<Effect, NewOutput>(
+            effects: effects,
+            outputs: outputs.map(transform)
+        )
+    }
 }
 
 /// Result returned by effect execution.
