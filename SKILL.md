@@ -657,3 +657,54 @@ When generating ConstruktKit code, AI often hallucinates SwiftUI equivalents. If
 3. Wrong modifier signatures (e.g. wrong padding parameters or `.border` arguments)
 4. Wrong component initializer signatures (e.g. `SpacerView(width:)` instead of `FixedSpacerView(width:)`)
 5. Using `ZStackView` + `.position(.top)` for nav bars instead of `Screen { ... }.navigationBar { ... }`
+
+---
+
+### Feature Composition
+
+**Pattern: Parent-child reducer delegation**
+```swift
+case .child(let childIntent):
+    let childResult = ChildFeature.reduce(state: &state.child, intent: childIntent)
+    return childResult.map(
+        effect: { Effect.child($0) },
+        output: { Output.child($0) }
+    )
+```
+
+**Pattern: Effect executor delegation**
+```swift
+case .child(let childEffect):
+    let childFeedback = try await childExecutor(childEffect, deps.childDeps)
+    return childFeedback.map(intent: { .child($0) }, output: { .child($0) })
+```
+
+**Pattern: Policy delegation**
+```swift
+case .child(let childEffect):
+    return ChildFeature.policy(for: childEffect)
+```
+
+**Anti-pattern: Forgetting to map child types**
+```swift
+// WRONG: Returns ReduceResult<ChildEffect, ChildOutput> — type mismatch
+case .child(let childIntent):
+    return ChildFeature.reduce(state: &state.child, intent: childIntent)
+
+// RIGHT: Map to parent types
+case .child(let childIntent):
+    return ChildFeature.reduce(state: &state.child, intent: childIntent)
+        .map(effect: { .child($0) }, output: { .child($0) })
+```
+
+**Anti-pattern: Creating separate FeatureStore for child**
+```swift
+// WRONG: Child runs in its own runtime — no composition
+let childStore = FeatureStore<ChildFeature>(...)
+let parentStore = FeatureStore<ParentFeature>(...)
+
+// RIGHT: Single parent store, child state embedded
+let store = FeatureStore<ParentFeature>(...)
+store.dispatch(.child(.loadProfile))
+store.state.map(\.child.username)  // observe child state through parent
+```
