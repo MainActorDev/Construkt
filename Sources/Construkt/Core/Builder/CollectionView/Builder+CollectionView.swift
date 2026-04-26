@@ -138,6 +138,9 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
     /// Tracks whether the compositional layout has been set up
     private var hasInitializedLayout = false
     
+    /// When set, this layout is used instead of creating a UICollectionViewCompositionalLayout.
+    var customLayout: UICollectionViewLayout?
+    
     public override init(frame: CGRect) {
         super.init(frame: frame)
         setup()
@@ -173,52 +176,60 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
         
         let activeLayout: UICollectionViewLayout
         if !hasInitializedLayout {
-            // Create layout once — the provider closure reads from currentSectionMap.
-            // Boundary supplementary items are NEVER removed based on isHidden.
-            // Instead, the supplementaryViewProvider returns a zero-height EmptySupplementaryView
-            // when hidden, allowing the layout structure to stay stable across visibility changes.
-            // This avoids recreating the layout (which disrupts visibleItemsInvalidationHandler,
-            // zIndex, orthogonalScrollingBehavior, etc.) and avoids the iOS 16 bug where
-            // UICollectionViewCompositionalLayout caches section layouts aggressively and
-            // does not re-invoke the section provider after invalidateLayout().
-            let layout = UICollectionViewCompositionalLayout { [weak self] index, _ in
-                guard let self = self,
-                      let sect = self.dataSource.sectionIdentifier(at: index) else { return nil }
-                
-                // O(1) Lookup
-                if let sectionController = self.currentSectionMap[sect],
-                   let sectionLayout = sectionController.layoutProvider?(sect) {
+            if let custom = customLayout {
+                // Use the user-provided custom layout directly.
+                // Section-level layoutProviders are ignored — the custom layout governs everything.
+                collectionView.setCollectionViewLayout(custom, animated: false)
+                hasInitializedLayout = true
+                activeLayout = custom
+            } else {
+                // Create layout once — the provider closure reads from currentSectionMap.
+                // Boundary supplementary items are NEVER removed based on isHidden.
+                // Instead, the supplementaryViewProvider returns a zero-height EmptySupplementaryView
+                // when hidden, allowing the layout structure to stay stable across visibility changes.
+                // This avoids recreating the layout (which disrupts visibleItemsInvalidationHandler,
+                // zIndex, orthogonalScrollingBehavior, etc.) and avoids the iOS 16 bug where
+                // UICollectionViewCompositionalLayout caches section layouts aggressively and
+                // does not re-invoke the section provider after invalidateLayout().
+                let layout = UICollectionViewCompositionalLayout { [weak self] index, _ in
+                    guard let self = self,
+                          let sect = self.dataSource.sectionIdentifier(at: index) else { return nil }
                     
-                    // Apply any layout modifiers (e.g. from .decorationItem used out of order)
-                    sectionController.layoutModifiers.forEach { $0(sectionLayout) }
-                    
-                    // Hide empty sections logic
-                    if self.dataSource.snapshot().numberOfItems(inSection: sectionController) == 0 {
-                        sectionLayout.contentInsets = .zero
-                        sectionLayout.decorationItems = []
-                        sectionLayout.boundarySupplementaryItems = []
-                    } else {
-                        // Only remove boundary items for headers/footers that don't exist at all.
-                        // Hidden headers/footers keep their boundary item so the supplementary
-                        // provider is always called — it returns a zero-height fallback view.
-                        sectionLayout.boundarySupplementaryItems = sectionLayout.boundarySupplementaryItems.filter { item in
-                            if item.elementKind == UICollectionView.elementKindSectionHeader {
-                                return sectionController.header != nil
-                            } else if item.elementKind == UICollectionView.elementKindSectionFooter {
-                                return sectionController.footer != nil
+                    // O(1) Lookup
+                    if let sectionController = self.currentSectionMap[sect],
+                       let sectionLayout = sectionController.layoutProvider?(sect) {
+                        
+                        // Apply any layout modifiers (e.g. from .decorationItem used out of order)
+                        sectionController.layoutModifiers.forEach { $0(sectionLayout) }
+                        
+                        // Hide empty sections logic
+                        if self.dataSource.snapshot().numberOfItems(inSection: sectionController) == 0 {
+                            sectionLayout.contentInsets = .zero
+                            sectionLayout.decorationItems = []
+                            sectionLayout.boundarySupplementaryItems = []
+                        } else {
+                            // Only remove boundary items for headers/footers that don't exist at all.
+                            // Hidden headers/footers keep their boundary item so the supplementary
+                            // provider is always called — it returns a zero-height fallback view.
+                            sectionLayout.boundarySupplementaryItems = sectionLayout.boundarySupplementaryItems.filter { item in
+                                if item.elementKind == UICollectionView.elementKindSectionHeader {
+                                    return sectionController.header != nil
+                                } else if item.elementKind == UICollectionView.elementKindSectionFooter {
+                                    return sectionController.footer != nil
+                                }
+                                return true
                             }
-                            return true
                         }
+                        
+                        return sectionLayout
                     }
                     
-                    return sectionLayout
+                    return nil
                 }
-                
-                return nil
+                collectionView.setCollectionViewLayout(layout, animated: false)
+                hasInitializedLayout = true
+                activeLayout = layout
             }
-            collectionView.setCollectionViewLayout(layout, animated: false)
-            hasInitializedLayout = true
-            activeLayout = layout
         } else {
             activeLayout = collectionView.collectionViewLayout
         }
@@ -365,6 +376,22 @@ public extension CollectionView {
         return self
     }
     
+    /// Replaces the default `UICollectionViewCompositionalLayout` with a custom layout.
+    ///
+    /// When a custom layout is set, per-section `.layout {}` modifiers are ignored —
+    /// the custom layout governs the entire collection view.
+    ///
+    /// This is useful for nesting a `CollectionView` with a non-compositional layout
+    /// (e.g., `UICollectionViewFlowLayout` or a custom subclass) inside an `AnyCell`.
+    ///
+    /// - Parameter layout: A `UICollectionViewLayout` subclass instance.
+    /// - Returns: The modified `CollectionView`.
+    public func customLayout(_ layout: UICollectionViewLayout) -> CollectionView {
+        modifiableView.customLayout = layout
+        // Set the layout immediately so it's available before the first update
+        modifiableView.collectionView.setCollectionViewLayout(layout, animated: false)
+        return self
+    }
 
 }
 
