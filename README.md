@@ -749,6 +749,152 @@ navBarBackground.alpha = progress
 
 ---
 
+### Feature Composition
+
+Construkt supports composing parent and child features using type-mapping methods on `ReduceResult` and `EffectFeedback`. The parent feature embeds the child's state, intents, and effects, then delegates to the child's reducer and effect executor.
+
+#### Defining Parent and Child
+
+```swift
+// Child feature
+enum ProfileFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var username: String = ""
+        var isLoading: Bool = false
+    }
+    enum Intent: Sendable {
+        case loadProfile
+        case profileLoaded(String)
+    }
+    enum Effect: Sendable, Hashable {
+        case fetchProfile
+    }
+    enum Output: Sendable {
+        case didLogOut
+    }
+    struct Dependencies: Sendable {
+        let api: ProfileAPI
+    }
+
+    static var initialState: State { State() }
+
+    static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+        switch intent {
+        case .loadProfile:
+            state.isLoading = true
+            return ReduceResult(effects: [.fetchProfile])
+        case .profileLoaded(let name):
+            state.username = name
+            state.isLoading = false
+            return .none
+        }
+    }
+
+    static func policy(for effect: Effect) -> EffectPolicy {
+        .latest("fetchProfile")
+    }
+}
+
+// Parent embeds child
+enum AppFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var profile: ProfileFeature.State = ProfileFeature.initialState  // embed child state
+        var sessionCount: Int = 0
+    }
+    enum Intent: Sendable {
+        case profile(ProfileFeature.Intent)  // wrap child intents
+        case incrementSession
+    }
+    enum Effect: Sendable, Hashable {
+        case profile(ProfileFeature.Effect)  // wrap child effects
+    }
+    enum Output: Sendable {
+        case profile(ProfileFeature.Output)  // wrap child outputs
+    }
+    // ...
+}
+```
+
+#### Reducer Composition
+
+In the parent reducer, delegate to the child reducer and map the result:
+
+```swift
+static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+    switch intent {
+    case .profile(let childIntent):
+        // 1. Delegate to child
+        let childResult = ProfileFeature.reduce(state: &state.profile, intent: childIntent)
+
+        // 2. Map child types to parent types
+        var result = childResult.map(
+            effect: { Effect.profile($0) },
+            output: { Output.profile($0) }
+        )
+
+        // 3. Parent can observe and react
+        if case .profileLoaded = childIntent {
+            state.sessionCount += 1
+        }
+
+        return result
+
+    case .incrementSession:
+        state.sessionCount += 1
+        return .none
+    }
+}
+```
+
+#### Effect Executor Composition
+
+Compose effect executors by delegating child effects and mapping feedback:
+
+```swift
+let appExecutor: FeatureEffectExecutor<AppFeature> = { effect, deps in
+    switch effect {
+    case .profile(let childEffect):
+        let childFeedback = try await profileExecutor(childEffect, deps.profileDeps)
+        return childFeedback.map(
+            intent: { .profile($0) },
+            output: { .profile($0) }
+        )
+    case .trackSession:
+        // parent's own effect
+        return .none
+    }
+}
+```
+
+#### Policy Delegation
+
+Delegate effect policies to the child feature:
+
+```swift
+static func policy(for effect: Effect) -> EffectPolicy {
+    switch effect {
+    case .profile(let childEffect):
+        return ProfileFeature.policy(for: childEffect)
+    case .trackSession:
+        return .concurrent
+    }
+}
+```
+
+#### Composition API Reference
+
+| Method | Purpose |
+|--------|---------|
+| `ReduceResult.map(effect:output:)` | Transform child reduce result to parent types |
+| `ReduceResult.mapEffects(_:)` | Map only effects, preserve output type |
+| `ReduceResult.mapOutputs(_:)` | Map only outputs, preserve effect type |
+| `ReduceResult.merged(with:)` | Combine two reduce results |
+| `EffectFeedback.map(intent:output:)` | Transform child effect feedback to parent types |
+| `EffectFeedback.mapIntents(_:)` | Map only intents, preserve output type |
+| `EffectFeedback.mapOutputs(_:)` | Map only outputs, preserve intent type |
+
+---
+
 ## Navigation & Auto-Routing
 
 Construkt includes a flexible navigation engine with two approaches: **ConstruktRouteHandler** for centralized route handling, and **ConstruktCoordinator** for coordinator-tree architectures. Both use UIKit's responder chain so views never hold direct references to navigation logic.
