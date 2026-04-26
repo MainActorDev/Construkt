@@ -268,6 +268,33 @@ public extension ViewBinding {
         }
     }
     
+    /// Delays each emitted value by the specified time interval before forwarding it.
+    @_disfavoredOverload
+    func delay(_ interval: TimeInterval, on queue: DispatchQueue = .main) -> AnyViewBinding<Value> {
+        return AnyViewBinding { queue, handler in
+            self.observe(on: queue) { value in
+                queue?.asyncAfter(deadline: .now() + interval) {
+                    handler(value)
+                }
+            }
+        }
+    }
+    
+    /// Transforms each value into a new binding and only observes the latest one, cancelling previous subscriptions.
+    @_disfavoredOverload
+    func flatMapLatest<T>(_ transform: @escaping (Value) -> AnyViewBinding<T>) -> AnyViewBinding<T> {
+        return AnyViewBinding<T> { queue, handler in
+            var innerCancellable: AnyCancellableLifecycle?
+            return self.observe(on: queue) { value in
+                innerCancellable?.cancel()
+                let inner = transform(value)
+                innerCancellable = inner.observe(on: queue) { innerValue in
+                    handler(innerValue)
+                }
+            }
+        }
+    }
+    
     /// Merges emissions from this binding and another binding of the same type into a single stream.
     @_disfavoredOverload
     func merge<B: ViewBinding>(with other: B) -> AnyViewBinding<Value> where B.Value == Value {

@@ -97,6 +97,7 @@ public final class FeatureStore<F: FeatureSpec> {
         await synchronizeStateFromRuntime()
     }
 
+    /// Subscribes to state changes, delivering updates on the specified queue.
     @discardableResult
     public func observeState(
         on queue: DispatchQueue? = .main,
@@ -105,6 +106,7 @@ public final class FeatureStore<F: FeatureSpec> {
         state.observe(on: queue, handler)
     }
 
+    /// Subscribes to one-off output events, delivering them on the specified queue.
     @discardableResult
     public func observeOutputs(
         on queue: DispatchQueue? = .main,

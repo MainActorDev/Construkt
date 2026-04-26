@@ -330,3 +330,156 @@ struct SpacerTests {
         #expect(widthConstraint?.priority == .required)
     }
 }
+
+// MARK: - ScrollView Tests
+
+@Suite("ScrollView Tests")
+@MainActor
+struct ScrollViewTests {
+    @Test("ScrollView creates UIScrollView")
+    func scrollViewCreation() {
+        let scrollView = ScrollView(nil)
+        let uiView = scrollView.build()
+        #expect(uiView is UIScrollView)
+    }
+
+    @Test("ScrollView with content creates UIScrollView")
+    func scrollViewWithContent() {
+        let scrollView = ScrollView {
+            UIView()
+        }
+        let uiView = scrollView.build()
+        #expect(uiView is UIScrollView)
+    }
+
+    @Test("bounces modifier sets bounces property")
+    func bouncesModifier() {
+        let scrollView = ScrollView(nil)
+            .bounces(false)
+        let uiView = scrollView.build() as! UIScrollView
+        #expect(uiView.bounces == false)
+    }
+
+    @Test("showVerticalIndicator modifier")
+    func showVerticalIndicator() {
+        let scrollView = ScrollView(nil)
+            .showVerticalIndicator(false)
+        let uiView = scrollView.build() as! UIScrollView
+        #expect(uiView.showsVerticalScrollIndicator == false)
+    }
+
+    @Test("showHorizontalIndicator modifier")
+    func showHorizontalIndicator() {
+        let scrollView = ScrollView(nil)
+            .showHorizontalIndicator(false)
+        let uiView = scrollView.build() as! UIScrollView
+        #expect(uiView.showsHorizontalScrollIndicator == false)
+    }
+
+    @Test("VerticalScrollView creates UIScrollView")
+    func verticalScrollViewCreation() {
+        let scrollView = VerticalScrollView(nil)
+        let uiView = scrollView.build()
+        #expect(uiView is UIScrollView)
+    }
+}
+
+// MARK: - Image Binding Tests
+
+@Suite("Image Binding Tests")
+@MainActor
+struct ImageBindingTests {
+    @Test("ImageView with UIImage creates UIImageView")
+    func imageViewWithUIImage() {
+        let image = UIImage()
+        let imageView = ImageView(image)
+        let uiView = imageView.build()
+        #expect(uiView is UIImageView)
+        #expect((uiView as! UIImageView).image === image)
+    }
+
+    @Test("ImageView with system name creates UIImageView")
+    func imageViewWithSystemName() {
+        let imageView = ImageView(systemName: "star")
+        let uiView = imageView.build()
+        #expect(uiView is UIImageView)
+        #expect((uiView as! UIImageView).image != nil)
+    }
+
+    @Test("ImageView with named image")
+    func imageViewWithNamedImage() {
+        let imageView = ImageView(named: "nonexistent_test_image")
+        let uiView = imageView.build()
+        #expect(uiView is UIImageView)
+    }
+
+    @Test("ImageView reactive init with Property binding")
+    func imageBindModifier() {
+        let image = UIImage()
+        let property = Property<UIImage>(image)
+        let imageView = ImageView(property)
+        let uiView = imageView.build()
+        #expect(uiView is UIImageView)
+    }
+
+    @Test("image bind modifier with optional Property")
+    func imageBindOptionalModifier() {
+        let property = Property<UIImage?>(nil)
+        let imageView = ImageView(UIImage())
+            .image(bind: property)
+        let uiView = imageView.build() as! UIImageView
+        let newImage = UIImage()
+        property.wrappedValue = newImage
+        #expect(uiView.image === newImage)
+    }
+
+    @Test("tintColor modifier on ImageView")
+    func tintColorModifier() {
+        let imageView = ImageView(systemName: "star")
+            .tintColor(.red)
+        let uiView = imageView.build() as! UIImageView
+        #expect(uiView.tintColor == .red)
+    }
+}
+
+// MARK: - Style Tests
+
+@Suite("Style Tests")
+@MainActor
+struct StyleTests {
+    struct RedBackgroundStyle: BuilderStyle {
+        func apply(to view: UIView) {
+            view.backgroundColor = .red
+        }
+    }
+
+    struct LabelBoldStyle: BuilderStyle {
+        func apply(to view: UILabel) {
+            view.font = .boldSystemFont(ofSize: 16)
+        }
+    }
+
+    @Test("style modifier applies UIView style")
+    func styleModifierAppliesUIViewStyle() {
+        let label = UILabel()
+        let modified = ViewModifier<UILabel>(label)
+            .style(RedBackgroundStyle())
+        #expect(modified.build().backgroundColor == UIColor.red)
+    }
+
+    @Test("style modifier applies typed style")
+    func styleModifierAppliesTypedStyle() {
+        let label = UILabel()
+        let modified = ViewModifier<UILabel>(label)
+            .style(LabelBoldStyle())
+        #expect((modified.build() as! UILabel).font == UIFont.boldSystemFont(ofSize: 16))
+    }
+
+    @Test("UIView style applies to any view type")
+    func uiViewStyleAppliesToAnyView() {
+        let button = UIButton()
+        let modified = ViewModifier<UIButton>(button)
+            .style(RedBackgroundStyle())
+        #expect(modified.build().backgroundColor == UIColor.red)
+    }
+}

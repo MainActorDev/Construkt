@@ -42,6 +42,7 @@ public final class Signal<T>: ViewBinding {
         }
     }
     
+    /// Subscribes to future events. Unlike `Property`, no initial value is emitted.
     public func observe(on queue: DispatchQueue? = .main, _ handler: @escaping (T) -> Void) -> AnyCancellableLifecycle {
         lock.lock()
         defer { lock.unlock() }

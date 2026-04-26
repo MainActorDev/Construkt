@@ -15,12 +15,14 @@ public final class CancelBag {
     
     public init() {}
     
+    /// Adds a cancellable token to the bag, retaining it until the bag is cancelled or deallocated.
     public func insert(_ cancellable: AnyCancellableLifecycle) {
         lock.lock()
         defer { lock.unlock() }
         cancellables.append(cancellable)
     }
     
+    /// Cancels all stored tokens and empties the bag.
     public func cancel() {
         lock.lock()
         let items = cancellables
