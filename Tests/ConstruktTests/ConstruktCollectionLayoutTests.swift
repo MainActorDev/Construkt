@@ -3,6 +3,7 @@ import Testing
 import UIKit
 
 @Suite("ConstruktCollectionLayout Protocol")
+@MainActor
 struct ConstruktCollectionLayoutTests {
 
     @Test("protocol provides section metadata to layout")

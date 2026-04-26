@@ -3,6 +3,7 @@ import Testing
 import UIKit
 
 @Suite("Flow Layout Integration")
+@MainActor
 struct FlowLayoutIntegrationTests {
 
     @Test("flow layout sets layoutProvider on SectionConfig")

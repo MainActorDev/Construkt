@@ -3,6 +3,7 @@ import Testing
 import UIKit
 
 @Suite("CollectionView Custom Layout")
+@MainActor
 struct CustomLayoutCollectionViewTests {
 
     @Test("customLayout sets the provided layout on the collection view")

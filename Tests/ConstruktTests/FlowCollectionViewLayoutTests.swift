@@ -3,6 +3,7 @@ import Testing
 import UIKit
 
 @Suite("FlowCollectionViewLayout")
+@MainActor
 struct FlowCollectionViewLayoutTests {
 
     @Test("layout conforms to ConstruktCollectionLayout")
