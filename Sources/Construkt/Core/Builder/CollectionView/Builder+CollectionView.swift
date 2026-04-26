@@ -258,6 +258,19 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
         // reloadSections, which causes UIKit to re-request supplementary views from the
         // supplementaryViewProvider — swapping between the real header and the zero-height fallback.
         dataSource.display(sections)
+        
+        // If using a ConstruktCollectionLayout, push metadata to the layout
+        if let construktLayout = collectionView.collectionViewLayout as? ConstruktCollectionLayout {
+            let metadata = CollectionLayoutMetadata(
+                sections: sections.map { section in
+                    CollectionLayoutMetadata.Section(
+                        identifier: section.identifier.uniqueId,
+                        itemCount: section.cells.count
+                    )
+                }
+            )
+            construktLayout.updateMetadata(metadata)
+        }
     }
     
     
