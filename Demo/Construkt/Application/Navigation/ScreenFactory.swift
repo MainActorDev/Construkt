@@ -19,6 +19,8 @@ final class ScreenFactory: ScreenFactoryProtocol {
             return ExploreView().toPresentable()
         case .search:
             return SearchViewController()
+        case .tagCloud:
+            return TagCloudView().toPresentable(trackingLabel: "Tag Cloud")
         case .profile:
             return ProfileView().toPresentable()
         case .movieDetail(let id):

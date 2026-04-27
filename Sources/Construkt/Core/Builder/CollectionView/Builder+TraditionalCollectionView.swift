@@ -1,8 +1,7 @@
 //
-//  👨‍💻 Created by @thatswiftdev on 04/02/26.
+//  Created by Construkt.
 //
 //  © 2026, https://github.com/thatswiftdev. All rights reserved.
-//
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -21,65 +20,81 @@
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //  THE SOFTWARE.
-//
 
 import UIKit
 
-// MARK: - CollectionView Wrapper
+// MARK: - TraditionalCollectionView
 
-/// A declarative builder component that bridges Construkt's View architecture with modern
-/// `UICollectionView` APIs powered by Diffable Data Sources and Compositional Layouts.
-public struct CollectionView: ModifiableView {
-    
-    public let modifiableView = CollectionViewWrapperView()
-    
-    /// Initializes a declarative collection view dynamically mapped to a reactive stream of `Section` arrays.
-    public init(@AnySectionResultBuilder content: () -> AnyViewBinding<[SectionConfig]>) {
+/// A declarative builder component that bridges Construkt's View architecture with
+/// `UICollectionView` using any `UICollectionViewLayout` subclass.
+///
+/// Unlike `CollectionView` (which is hardcoded to `UICollectionViewCompositionalLayout`),
+/// `TraditionalCollectionView` accepts any layout — `UICollectionViewFlowLayout`,
+/// custom `UICollectionViewLayout` subclasses, etc.
+///
+/// Usage:
+/// ```swift
+/// TraditionalCollectionView(layout: UICollectionViewFlowLayout()) {
+///     AnySection(id: .tags, items: tags) { tag in
+///         AnyCell(tag, id: tag.id) { TagChipView(tag: $0) }
+///     }
+///     .onSelect { tag in print(tag.name) }
+/// }
+/// ```
+public struct TraditionalCollectionView: ModifiableView {
+
+    public let modifiableView: TraditionalCollectionViewWrapperView
+
+    /// Initializes a declarative collection view with a custom layout, dynamically mapped
+    /// to a reactive stream of `Section` arrays.
+    ///
+    /// - Parameters:
+    ///   - layout: The `UICollectionViewLayout` to use. This layout is set once at init
+    ///     and governs the entire collection view.
+    ///   - content: A result builder closure producing a reactive binding of section configurations.
+    public init(
+        layout: UICollectionViewLayout,
+        @AnySectionResultBuilder content: () -> AnyViewBinding<[SectionConfig]>
+    ) {
+        let wrapper = TraditionalCollectionViewWrapperView(layout: layout)
+        self.modifiableView = wrapper
+
         let sectionsBinding = content()
-        
-        sectionsBinding.observe(on: .main) { [weak modifiableView] sections in
-            modifiableView?.update(sections: sections)
-        }.store(in: modifiableView.cancelBag)
+        sectionsBinding.observe(on: .main) { [weak wrapper] sections in
+            wrapper?.update(sections: sections)
+        }.store(in: wrapper.cancelBag)
     }
 }
 
-/// The internal `UIView` subclass responsible for hosting the actual `UICollectionView` and
-/// maintaining the Diffable Data Source mappings.
-public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
+// MARK: - TraditionalCollectionViewWrapperView
+
+/// The internal `UIView` subclass responsible for hosting the actual `UICollectionView`
+/// with a user-provided `UICollectionViewLayout` and maintaining the Diffable Data Source mappings.
+public class TraditionalCollectionViewWrapperView: UIView, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+
     /// A zero-height supplementary view returned when a header/footer is hidden.
-    /// Overrides `preferredLayoutAttributesFitting` so that UICollectionViewCompositionalLayout
-    /// collapses this view to zero height when using `.estimated` sizing.
-    private final class EmptySupplementaryView: UICollectionReusableView {
-        override func preferredLayoutAttributesFitting(
-            _ layoutAttributes: UICollectionViewLayoutAttributes
-        ) -> UICollectionViewLayoutAttributes {
-            let attrs = super.preferredLayoutAttributesFitting(layoutAttributes)
-            attrs.frame.size.height = 0
-            attrs.size.height = 0
-            return attrs
-        }
-    }
+    private final class EmptySupplementaryView: UICollectionReusableView {}
 
-
-    
     public private(set) lazy var collectionView: UICollectionView = {
-        let cv = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: providedLayout)
         cv.backgroundColor = .clear
         cv.clipsToBounds = false
         cv.delegate = self
-        cv.register(EmptySupplementaryView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "FallbackEmptyHeader")
-        cv.register(EmptySupplementaryView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "FallbackEmptyFooter")
+        cv.register(
+            EmptySupplementaryView.self,
+            forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
+            withReuseIdentifier: "FallbackEmptyHeader"
+        )
+        cv.register(
+            EmptySupplementaryView.self,
+            forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
+            withReuseIdentifier: "FallbackEmptyFooter"
+        )
         return cv
     }()
-    
-    private lazy var refreshControl: UIRefreshControl = {
-        let refreshControl = UIRefreshControl()
-        refreshControl.tintColor = .white
-        refreshControl.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
-        refreshControl.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
-        return refreshControl
-    }()
-    
+
+    private let providedLayout: UICollectionViewLayout
+
     private lazy var dataSource: AnyCollectionDiffableDataSource = {
         let ds = AnyCollectionDiffableDataSource(
             collectionView: collectionView,
@@ -87,29 +102,32 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
                 return item.cell(in: collectionView, at: index)
             }
         )
-        
+
         ds.supplementaryViewProvider = { [weak self] collectionView, kind, indexPath in
-            guard kind == UICollectionView.elementKindSectionHeader || kind == UICollectionView.elementKindSectionFooter else {
+            guard kind == UICollectionView.elementKindSectionHeader ||
+                  kind == UICollectionView.elementKindSectionFooter else {
                 return nil
             }
 
             func dequeueFallback() -> UICollectionReusableView {
                 if kind == UICollectionView.elementKindSectionHeader {
-                    return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyHeader", for: indexPath)
+                    return collectionView.dequeueReusableSupplementaryView(
+                        ofKind: kind, withReuseIdentifier: "FallbackEmptyHeader", for: indexPath
+                    )
                 } else {
-                    return collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "FallbackEmptyFooter", for: indexPath)
+                    return collectionView.dequeueReusableSupplementaryView(
+                        ofKind: kind, withReuseIdentifier: "FallbackEmptyFooter", for: indexPath
+                    )
                 }
             }
 
-            // Identify section via currentSectionMap for O(1) lookup and guaranteed
-            // consistency with the layout provider (both read the same source of truth).
             guard let self = self,
                   let identifier = self.dataSource.sectionIdentifier(at: indexPath.section),
                   let section = self.currentSectionMap[identifier]
             else {
                 return dequeueFallback()
             }
-            
+
             if kind == UICollectionView.elementKindSectionHeader,
                let header = section.header,
                !header.isHidden {
@@ -124,30 +142,28 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
 
             return dequeueFallback()
         }
-        
+
         return ds
     }()
-    
+
     private lazy var adapter: CellConfigAdapter = {
         return CellConfigAdapter(dataSource: dataSource)
     }()
-    
-    /// Cached section map for O(1) layout provider lookups
+
+    /// Cached section map for O(1) lookups by section identifier.
     private var currentSectionMap: [String: SectionConfig] = [:]
-    
-    /// Tracks whether the compositional layout has been set up
-    private var hasInitializedLayout = false
-    
-    public override init(frame: CGRect) {
-        super.init(frame: frame)
+
+    public init(layout: UICollectionViewLayout) {
+        self.providedLayout = layout
+        super.init(frame: .zero)
         setup()
     }
-    
+
+    @available(*, unavailable)
     public required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
+        fatalError("init(coder:) is not supported")
     }
-    
+
     private func setup() {
         addSubview(collectionView)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
@@ -158,117 +174,71 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
             collectionView.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
     }
-    
+
     /// Provides responder hierarchy access to the internal representation of a section.
     public func sectionController(for sectionIndex: Int) -> SectionConfig? {
         guard let identifier = dataSource.sectionIdentifier(at: sectionIndex) else { return nil }
         return currentSectionMap[identifier]
     }
-    
+
     func update(sections: [SectionConfig]) {
-        // Update the cached section map before applying data
         currentSectionMap = Dictionary(
             uniqueKeysWithValues: sections.map { ($0.identifier.uniqueId, $0) }
         )
-        
-        let activeLayout: UICollectionViewLayout
-        if !hasInitializedLayout {
-            // Create layout once — the provider closure reads from currentSectionMap.
-            // Boundary supplementary items are NEVER removed based on isHidden.
-            // Instead, the supplementaryViewProvider returns a zero-height EmptySupplementaryView
-            // when hidden, allowing the layout structure to stay stable across visibility changes.
-            // This avoids recreating the layout (which disrupts visibleItemsInvalidationHandler,
-            // zIndex, orthogonalScrollingBehavior, etc.) and avoids the iOS 16 bug where
-            // UICollectionViewCompositionalLayout caches section layouts aggressively and
-            // does not re-invoke the section provider after invalidateLayout().
-            let layout = UICollectionViewCompositionalLayout { [weak self] index, _ in
-                guard let self = self,
-                      let sect = self.dataSource.sectionIdentifier(at: index) else { return nil }
-                
-                // O(1) Lookup
-                if let sectionController = self.currentSectionMap[sect],
-                   let sectionLayout = sectionController.layoutProvider?(sect) {
-                    
-                    // Apply any layout modifiers (e.g. from .decorationItem used out of order)
-                    sectionController.layoutModifiers.forEach { $0(sectionLayout) }
-                    
-                    // Hide empty sections logic
-                    if self.dataSource.snapshot().numberOfItems(inSection: sectionController) == 0 {
-                        sectionLayout.contentInsets = .zero
-                        sectionLayout.decorationItems = []
-                        sectionLayout.boundarySupplementaryItems = []
-                    } else {
-                        // Only remove boundary items for headers/footers that don't exist at all.
-                        // Hidden headers/footers keep their boundary item so the supplementary
-                        // provider is always called — it returns a zero-height fallback view.
-                        sectionLayout.boundarySupplementaryItems = sectionLayout.boundarySupplementaryItems.filter { item in
-                            if item.elementKind == UICollectionView.elementKindSectionHeader {
-                                return sectionController.header != nil
-                            } else if item.elementKind == UICollectionView.elementKindSectionFooter {
-                                return sectionController.footer != nil
-                            }
-                            return true
-                        }
-                    }
-                    
-                    return sectionLayout
-                }
-                
-                return nil
-            }
-            collectionView.setCollectionViewLayout(layout, animated: false)
-            hasInitializedLayout = true
-            activeLayout = layout
-        } else {
-            activeLayout = collectionView.collectionViewLayout
-        }
-        
-        // Extract all unique background decoration element kinds from active layouts
-        var customBackgroundKinds = Set<String>()
-        
-        for section in sections {
-            if let sectLayout = section.layoutProvider?(section.identifier.uniqueId) {
-                section.layoutModifiers.forEach { $0(sectLayout) }
-                sectLayout.decorationItems.forEach { item in
-                    if item.elementKind.hasPrefix("custom_bg_") {
-                        customBackgroundKinds.insert(item.elementKind)
-                    }
-                }
-            }
-        }
-        
-        // Register all variations dynamically (ignores already registered safely)
-        for kind in customBackgroundKinds {
-            activeLayout.register(CustomBackgroundReusableView.self, forDecorationViewOfKind: kind)
-        }
-        
-        // Apply data changes (smart incremental diffing).
-        // When isHidden changes, DataSource.display() detects the change and calls
-        // reloadSections, which causes UIKit to re-request supplementary views from the
-        // supplementaryViewProvider — swapping between the real header and the zero-height fallback.
         dataSource.display(sections)
     }
-    
-    
+
     // MARK: - Delegate Forwarding
-    
+
     public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         adapter.collectionView(collectionView, didSelectItemAt: indexPath)
     }
-    
+
     public func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
         adapter.collectionView(collectionView, prefetchItemsAt: indexPaths)
     }
-    
+
     public func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
         adapter.collectionView(collectionView, cancelPrefetchingForItemsAt: indexPaths)
     }
-    
+
+    // MARK: - Flow Layout Delegate
+
+    public func collectionView(
+        _ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        referenceSizeForHeaderInSection section: Int
+    ) -> CGSize {
+        guard collectionViewLayout is UICollectionViewFlowLayout else { return .zero }
+        guard let identifier = dataSource.sectionIdentifier(at: section),
+              let sectionConfig = currentSectionMap[identifier],
+              let header = sectionConfig.header,
+              !header.isHidden else {
+            return .zero
+        }
+        return CGSize(width: collectionView.bounds.width, height: 44)
+    }
+
+    public func collectionView(
+        _ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        referenceSizeForFooterInSection section: Int
+    ) -> CGSize {
+        guard collectionViewLayout is UICollectionViewFlowLayout else { return .zero }
+        guard let identifier = dataSource.sectionIdentifier(at: section),
+              let sectionConfig = currentSectionMap[identifier],
+              let footer = sectionConfig.footer,
+              !footer.isHidden else {
+            return .zero
+        }
+        return CGSize(width: collectionView.bounds.width, height: 44)
+    }
+
     // MARK: - Empty State
-    
+
     public var emptyStateProvider: (() -> UIView)?
     private var emptyStateView: UIView?
-    
+
     internal func updateEmptyState(show: Bool) {
         if show {
             if emptyStateView == nil {
@@ -293,20 +263,28 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
             collectionView.isHidden = false
         }
     }
-    
+
     // MARK: - Refresh Control
-    
+
+    private lazy var refreshControl: UIRefreshControl = {
+        let refreshControl = UIRefreshControl()
+        refreshControl.tintColor = .white
+        refreshControl.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
+        refreshControl.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
+        return refreshControl
+    }()
+
     private var onRefresh: (() -> Void)?
-    
+
     internal func setupRefreshControl(action: @escaping () -> Void) {
         self.onRefresh = action
         collectionView.refreshControl = refreshControl
     }
-    
+
     @objc private func handleRefresh() {
         onRefresh?()
     }
-    
+
     internal func setRefreshing(_ isRefreshing: Bool) {
         if isRefreshing {
             if window != nil {
@@ -320,56 +298,59 @@ public class CollectionViewWrapperView: UIView, UICollectionViewDelegate {
             }
         }
     }
-    
+
     // MARK: - Scroll Observation
-    
+
     public var onScroll: ((UIScrollView) -> Void)?
     public var onWillBeginDragging: ((UIScrollView) -> Void)?
     public var onDidEndDragging: ((UIScrollView, Bool) -> Void)?
     public var onDidEndDecelerating: ((UIScrollView) -> Void)?
-    
+
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         onScroll?(scrollView)
     }
-    
+
     public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         onWillBeginDragging?(scrollView)
     }
-    
+
     public func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         onDidEndDragging?(scrollView, decelerate)
     }
-    
+
     public func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         onDidEndDecelerating?(scrollView)
     }
 }
 
-public extension CollectionView {
+// MARK: - TraditionalCollectionView Modifiers
+
+public extension TraditionalCollectionView {
     /// Dynamically swaps the internal collection view display for a custom empty state `View` when the
     /// bounding binding resolves to `true`.
-    func emptyState<B: ViewBinding>(when binding: B, @ViewResultBuilder _ content: @escaping () -> ViewConvertable) -> CollectionView where B.Value == Bool {
+    func emptyState<B: ViewBinding>(
+        when binding: B,
+        @ViewResultBuilder _ content: @escaping () -> ViewConvertable
+    ) -> TraditionalCollectionView where B.Value == Bool {
         let views = content().asViews()
         let view = VStackView(views)
             .alignment(.center)
             .build()
         modifiableView.emptyStateProvider = { view }
-        
+
         binding
             .distinctUntilChanged()
             .observe(on: .main) { [weak modifiableView] show in
                 modifiableView?.updateEmptyState(show: show)
             }
             .store(in: modifiableView.cancelBag)
-            
+
         return self
     }
-    
-
 }
 
-public extension ModifiableView where Base: CollectionViewWrapperView {
-    
+public extension ModifiableView where Base: TraditionalCollectionViewWrapperView {
+
     /// Adjusts the internal scroll view's content inset.
     @discardableResult
     func contentInset(
@@ -381,41 +362,41 @@ public extension ModifiableView where Base: CollectionViewWrapperView {
         modifiableView.collectionView.contentInset = .init(top: top, left: left, bottom: bottom, right: right)
         return ViewModifier(modifiableView)
     }
-    
+
     /// Installs a `UIRefreshControl` directly into the collection view, binding its active state
     /// to a specific boolean binding.
     @discardableResult
     func onRefresh<B: ViewBinding>(_ binding: B, action: @escaping () -> Void) -> ViewModifier<Base> where B.Value == Bool {
         modifiableView.setupRefreshControl(action: action)
-        
+
         binding.observe(on: .main) { [weak modifiableView] isRefreshing in
             modifiableView?.setRefreshing(isRefreshing)
         }.store(in: modifiableView.cancelBag)
-            
+
         return ViewModifier(modifiableView)
     }
-    
+
     /// Forwarded `UIScrollViewDelegate` scroll event.
     @discardableResult
     func onScroll(_ handler: @escaping (UIScrollView) -> Void) -> ViewModifier<Base> {
         modifiableView.onScroll = handler
         return ViewModifier(modifiableView)
     }
-    
+
     /// Forwarded `UIScrollViewDelegate` scroll view delegate will begin dragging.
     @discardableResult
     func onWillBeginDragging(_ handler: @escaping (UIScrollView) -> Void) -> ViewModifier<Base> {
         modifiableView.onWillBeginDragging = handler
         return ViewModifier(modifiableView)
     }
-    
+
     /// Forwarded `UIScrollViewDelegate` did end dragging.
     @discardableResult
     func onDidEndDragging(_ handler: @escaping (UIScrollView, Bool) -> Void) -> ViewModifier<Base> {
         modifiableView.onDidEndDragging = handler
         return ViewModifier(modifiableView)
     }
-    
+
     /// Forwarded `UIScrollViewDelegate` did end decelerating.
     @discardableResult
     func onDidEndDecelerating(_ handler: @escaping (UIScrollView) -> Void) -> ViewModifier<Base> {

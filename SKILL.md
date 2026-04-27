@@ -43,8 +43,7 @@ When generating UI, use the Construkt primitives:
 | `BlurView` / `UIVisualEffectView` | `BlurView(style: .regular)` |
 | `List` / `UITableView` | `TableView(DynamicItemViewBuilder) { ... }` |
 | `LazyVGrid`/`UICollectionView` | `CollectionView { AnySection { ... } }` |
-| Flow/tag cloud layout | `.layout { CollectionLayoutSectionBuilder.flow(itemSizes:) }` |
-| Custom collection layout | `CollectionView { ... }.customLayout(myLayout)` |
+| `TraditionalCollectionView` | Collection view with custom `UICollectionViewLayout` subclass support |
 | Screen layout container | `Screen { content }.navigationBar { bar }` |
 
 ---
@@ -149,7 +148,7 @@ VStackView {
 
 ## 🗂 Lists and Collections
 
-For lists, **always** use Construkt's declarative `CollectionView`. Never manually create Data Sources.
+For lists, **always** use Construkt's declarative `CollectionView` (compositional layout) or `TraditionalCollectionView` (custom layout subclasses). Never manually create Data Sources.
 
 ### 1. Dynamic Collections
 When binding to an array or an Rx `@Variable` array, provide the `items:` parameter to a `AnySection` constructor, and yield `Cell(...)` instances.
@@ -194,70 +193,7 @@ CollectionView {
 }
 ```
 
-### 3. Flow Layouts (Tag Clouds / Chip Lists)
-For variable-width items that wrap to the next line, use the `.flow()` layout factory on `CollectionLayoutSectionBuilder`. This works within the standard compositional layout — other sections can use `.list()`, `.grid()`, or `.carousel()` as usual.
-
-```swift
-AnySection(id: "tags", items: tags) { tag in
-    AnyCell(tag, id: tag.id) { tag in
-        TagChipCell(tag: tag)
-    }
-}
-.layout {
-    CollectionLayoutSectionBuilder.flow(
-        itemSizes: tags.map { $0.chipSize }, // Pre-measured [CGSize]
-        horizontalSpacing: 8,
-        lineSpacing: 8
-    )
-    .insets(top: 16, leading: 16, bottom: 16, trailing: 16)
-}
-```
-
-> **Important:** You must pre-measure item sizes before passing them to `.flow()`. The layout calculator needs widths upfront to compute wrapping positions.
-
-### 4. Custom Collection View Layouts
-For layouts that can't be expressed with compositional layout, bypass it entirely with `.customLayout()`:
-
-```swift
-let flowLayout = UICollectionViewFlowLayout()
-flowLayout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
-
-CollectionView {
-    AnySection(id: "items") { ... }
-}
-.customLayout(flowLayout)
-```
-
-When `.customLayout()` is set, per-section `.layout {}` modifiers are ignored — the custom layout governs the entire collection view.
-
-For custom layouts that need Construkt's section/item metadata, conform to `ConstruktCollectionLayout`:
-
-```swift
-class MyLayout: UICollectionViewLayout, ConstruktCollectionLayout {
-    private var metadata: CollectionLayoutMetadata?
-
-    func updateMetadata(_ metadata: CollectionLayoutMetadata) {
-        self.metadata = metadata
-        invalidateLayout()
-    }
-    // implement prepare(), layoutAttributesForElements(in:), etc.
-}
-```
-
-Construkt includes a built-in `FlowCollectionViewLayout` for wrapping flow layouts:
-
-```swift
-let flowLayout = FlowCollectionViewLayout { indexPath, metadata in
-    return CGSize(width: computedWidth, height: 32)
-}
-flowLayout.horizontalSpacing = 8
-flowLayout.sectionInsets = NSDirectionalEdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
-
-CollectionView { ... }
-    .customLayout(flowLayout)
-```
-
-### 5. Shimmer Loading States
+### 3. Shimmer Loading States
 Construkt supports natively swapping an entire `AnySection` with shimmer placeholders during load times. Use the `.shimmer(count:when:...)` modifier directly on the Section:
 
 ```swift
@@ -270,6 +206,46 @@ AnySection(id: "popular", items: viewModel.popularMovies) { movie in
     MoviePosterCell(movie: .placeholder) // Create geometry for shimmer
 }
 ```
+
+### 4. TraditionalCollectionView (Custom Layouts)
+
+When you need a layout that `UICollectionViewCompositionalLayout` cannot express — such as a **flow/tag-cloud layout** with variable-width items wrapping to the next line, circular layouts, or physics-based layouts — use `TraditionalCollectionView`. It accepts any `UICollectionViewLayout` subclass instead of being hardcoded to compositional layout.
+
+```swift
+let flowLayout = UICollectionViewFlowLayout()
+flowLayout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+flowLayout.minimumInteritemSpacing = 8
+flowLayout.minimumLineSpacing = 10
+flowLayout.sectionInset = UIEdgeInsets(top: 8, left: 20, bottom: 24, right: 20)
+flowLayout.headerReferenceSize = CGSize(width: 0, height: 44)
+
+TraditionalCollectionView(layout: flowLayout) {
+    AnySection(id: .tags, items: tags) { tag in
+        AnyCell(tag, id: tag.id) { model in
+            TagChipCell(tag: model)
+        }
+    }
+    .header {
+        Header { SectionHeaderLabel(title: "TRENDING") }
+    }
+    .onSelect { (tag: Tag) in
+        print("Selected: \(tag.name)")
+    }
+}
+.contentInset(top: 16, bottom: 32)
+```
+
+**When to use which:**
+- Use `CollectionView` when you need per-section compositional layouts (`.layout{}`), decoration items, or background decorations.
+- Use `TraditionalCollectionView` when you need a custom `UICollectionViewLayout` subclass (e.g., `UICollectionViewFlowLayout` with `automaticSize` for wrapping tag clouds).
+
+**Shared DSL:** `TraditionalCollectionView` uses the same `AnySection`/`AnyCell` result builders, diffable data source, selection handling (`.onSelect`, `.onRoute`), shimmer, headers/footers, and scroll observation as `CollectionView`.
+
+**Supported modifiers:** `.onSelect`, `.onRoute`, `.header()`, `.footer()`, `.headerHidden(when:)`, `.footerHidden(when:)`, `.shimmer()`, `.contentInset()`, `.onRefresh()`, `.onScroll()`, `.onWillBeginDragging()`, `.onDidEndDragging()`, `.onDidEndDecelerating()`, `.emptyState(when:)`.
+
+**Not applicable** (compositional-layout-specific, silently ignored): `.layout{}`, `.decorationItems()`, `.backgroundDecoration()`.
+
+**Note:** One layout governs all sections in `TraditionalCollectionView`. For per-section layout control, use `CollectionView` with `.layout{}` on each `AnySection`.
 
 ---
 
@@ -601,9 +577,9 @@ ZStackView { ... }.hideKeyboardOnBackgroundTap()
 2. **Never import SwiftUI.** Only import `UIKit` and `Construkt`.
 3. **Never write `setupConstraints()` or use `translatesAutoresizingMaskIntoConstraints = false`.**
 4. **Never create generic constraint arrays.** 
-5. **Never write `UICollectionViewDataSource` logic.** Use `CollectionView` ResultBuilders.
-6. **Never implement `UICollectionViewLayout` subclasses for simple flow/wrapping layouts.** Use `.layout { CollectionLayoutSectionBuilder.flow(itemSizes:) }` instead. Only use `.customLayout()` when the layout truly can't be expressed with compositional layout.
-7. **Never use `.layout {}` modifiers on sections when `.customLayout()` is set on the `CollectionView`.** The custom layout governs the entire collection view; per-section layout providers are ignored.
+5. **Never write `UICollectionViewDataSource` logic.** Use `CollectionView` or `TraditionalCollectionView` ResultBuilders.
+6. **Never use `.layout{}`, `.decorationItems()`, or `.backgroundDecoration()` with `TraditionalCollectionView`.** These are compositional-layout-specific and will be silently ignored. Configure layout via the `UICollectionViewLayout` instance passed at init.
+7. **Never use `TraditionalCollectionView` when `CollectionView` suffices.** If your layout can be expressed with `UICollectionViewCompositionalLayout` (lists, grids, carousels, orthogonal scrolling), prefer `CollectionView` with per-section `.layout{}` modifiers. Reserve `TraditionalCollectionView` for layouts that genuinely require a custom `UICollectionViewLayout` subclass.
 
 ---
 
