@@ -5,7 +5,8 @@ import ConstruktKit
 enum AppTab: Int {
     case home = 0
     case explore = 1
-    case profile = 2
+    case tagCloud = 2
+    case profile = 3
 }
 
 @available(iOS 15.0, *)
@@ -49,6 +50,15 @@ final class AppCoordinator: BaseCoordinator, RouteHandlingCoordinator {
         exploreCoordinator.start()
         exploreNav.tabBarItem = UITabBarItem(title: "Explore", image: UIImage(systemName: "magnifyingglass"), selectedImage: UIImage(systemName: "text.magnifyingglass"))
         
+        let tagCloudNav = NavigationController()
+        let tagCloudRouter = DefaultRouter(navigationController: tagCloudNav)
+        let tagCloudCoordinator = TagCloudCoordinator(router: tagCloudRouter, factory: factory)
+        store(tagCloudCoordinator)
+        
+        // Setup Tag Cloud Tab
+        tagCloudCoordinator.start()
+        tagCloudNav.tabBarItem = UITabBarItem(title: "Tags", image: UIImage(systemName: "tag"), selectedImage: UIImage(systemName: "tag.fill"))
+        
         let profileNav = NavigationController()
         let profileRouter = DefaultRouter(navigationController: profileNav)
         let profileCoordinator = ProfileCoordinator(router: profileRouter, factory: factory)
@@ -58,7 +68,7 @@ final class AppCoordinator: BaseCoordinator, RouteHandlingCoordinator {
         profileCoordinator.start()
         profileNav.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person.crop.circle"), selectedImage: UIImage(systemName: "person.crop.circle.fill"))
        
-        tabBarController.viewControllers = [homeNav, exploreNav, profileNav]
+        tabBarController.viewControllers = [homeNav, exploreNav, tagCloudNav, profileNav]
         
         // Styling TabBar roughly (can refine later with custom subclass)
         let appearance = UITabBarAppearance()
@@ -84,6 +94,8 @@ final class AppCoordinator: BaseCoordinator, RouteHandlingCoordinator {
             switchToTab(.home)
         case .explore, .search:
             switchToTab(.explore)
+        case .tagCloud:
+            switchToTab(.tagCloud)
         case .profile:
             switchToTab(.profile)
         case .movieDetail:

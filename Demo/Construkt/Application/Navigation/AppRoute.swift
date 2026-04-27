@@ -9,6 +9,7 @@ public enum AppRoute: Codable, Equatable, Hashable, Sendable {
     case search
     case profile
     case web(url: URL)
+    case tagCloud
     case back
     case bottomSheet
     case toast(message: String, position: ToastPosition)

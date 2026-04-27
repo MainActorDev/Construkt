@@ -148,7 +148,7 @@ VStackView {
 
 ## 🗂 Lists and Collections
 
-For lists, **always** use Construkt's declarative `CollectionView`. Never manually create Data Sources.
+For lists, **always** use Construkt's declarative `CollectionView` (compositional layout) or `TraditionalCollectionView` (custom layout subclasses). Never manually create Data Sources.
 
 ### 1. Dynamic Collections
 When binding to an array or an Rx `@Variable` array, provide the `items:` parameter to a `AnySection` constructor, and yield `Cell(...)` instances.
@@ -206,6 +206,46 @@ AnySection(id: "popular", items: viewModel.popularMovies) { movie in
     MoviePosterCell(movie: .placeholder) // Create geometry for shimmer
 }
 ```
+
+### 4. TraditionalCollectionView (Custom Layouts)
+
+When you need a layout that `UICollectionViewCompositionalLayout` cannot express — such as a **flow/tag-cloud layout** with variable-width items wrapping to the next line, circular layouts, or physics-based layouts — use `TraditionalCollectionView`. It accepts any `UICollectionViewLayout` subclass instead of being hardcoded to compositional layout.
+
+```swift
+let flowLayout = UICollectionViewFlowLayout()
+flowLayout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+flowLayout.minimumInteritemSpacing = 8
+flowLayout.minimumLineSpacing = 10
+flowLayout.sectionInset = UIEdgeInsets(top: 8, left: 20, bottom: 24, right: 20)
+flowLayout.headerReferenceSize = CGSize(width: 0, height: 44)
+
+TraditionalCollectionView(layout: flowLayout) {
+    AnySection(id: .tags, items: tags) { tag in
+        AnyCell(tag, id: tag.id) { model in
+            TagChipCell(tag: model)
+        }
+    }
+    .header {
+        Header { SectionHeaderLabel(title: "TRENDING") }
+    }
+    .onSelect { (tag: Tag) in
+        print("Selected: \(tag.name)")
+    }
+}
+.contentInset(top: 16, bottom: 32)
+```
+
+**When to use which:**
+- Use `CollectionView` when you need per-section compositional layouts (`.layout{}`), decoration items, or background decorations.
+- Use `TraditionalCollectionView` when you need a custom `UICollectionViewLayout` subclass (e.g., `UICollectionViewFlowLayout` with `automaticSize` for wrapping tag clouds).
+
+**Shared DSL:** `TraditionalCollectionView` uses the same `AnySection`/`AnyCell` result builders, diffable data source, selection handling (`.onSelect`, `.onRoute`), shimmer, headers/footers, and scroll observation as `CollectionView`.
+
+**Supported modifiers:** `.onSelect`, `.onRoute`, `.header()`, `.footer()`, `.headerHidden(when:)`, `.footerHidden(when:)`, `.shimmer()`, `.contentInset()`, `.onRefresh()`, `.onScroll()`, `.onWillBeginDragging()`, `.onDidEndDragging()`, `.onDidEndDecelerating()`, `.emptyState(when:)`.
+
+**Not applicable** (compositional-layout-specific, silently ignored): `.layout{}`, `.decorationItems()`, `.backgroundDecoration()`.
+
+**Note:** One layout governs all sections in `TraditionalCollectionView`. For per-section layout control, use `CollectionView` with `.layout{}` on each `AnySection`.
 
 ---
 
@@ -537,7 +577,9 @@ ZStackView { ... }.hideKeyboardOnBackgroundTap()
 2. **Never import SwiftUI.** Only import `UIKit` and `Construkt`.
 3. **Never write `setupConstraints()` or use `translatesAutoresizingMaskIntoConstraints = false`.**
 4. **Never create generic constraint arrays.** 
-5. **Never write `UICollectionViewDataSource` logic.** Use `CollectionView` ResultBuilders.
+5. **Never write `UICollectionViewDataSource` logic.** Use `CollectionView` or `TraditionalCollectionView` ResultBuilders.
+6. **Never use `.layout{}`, `.decorationItems()`, or `.backgroundDecoration()` with `TraditionalCollectionView`.** These are compositional-layout-specific and will be silently ignored. Configure layout via the `UICollectionViewLayout` instance passed at init.
+7. **Never use `TraditionalCollectionView` when `CollectionView` suffices.** If your layout can be expressed with `UICollectionViewCompositionalLayout` (lists, grids, carousels, orthogonal scrolling), prefer `CollectionView` with per-section `.layout{}` modifiers. Reserve `TraditionalCollectionView` for layouts that genuinely require a custom `UICollectionViewLayout` subclass.
 
 ---
 

@@ -32,6 +32,7 @@
   - [Dynamic Collection Views](#dynamic-collection-views)
   - [Static Collection Views](#static-collection-views)
   - [Shimmer Loading States](#shimmer-loading-states)
+  - [TraditionalCollectionView](#traditionalcollectionview)
 - [Advanced View Structure](#advanced-view-structure)
 - [Navigation & Auto-Routing](#navigation--auto-routing)
   - [Coordinators](#coordinators)
