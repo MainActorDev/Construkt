@@ -43,6 +43,7 @@ When generating UI, use the Construkt primitives:
 | `BlurView` / `UIVisualEffectView` | `BlurView(style: .regular)` |
 | `List` / `UITableView` | `TableView(DynamicItemViewBuilder) { ... }` |
 | `LazyVGrid`/`UICollectionView` | `CollectionView { AnySection { ... } }` |
+| `TraditionalCollectionView` | Collection view with custom `UICollectionViewLayout` subclass support |
 | Screen layout container | `Screen { content }.navigationBar { bar }` |
 
 ---

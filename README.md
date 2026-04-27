@@ -749,6 +749,33 @@ AnySection(id: "popular", items: movies) { movie in
 
 When `isLoading` is true, Construkt automatically generates 5 shimmer placeholder geometries based on your ViewBuilder structure and animates a shimmer gradient across them. When the data loads, it cross-dissolves them back to your actual fetched data natively.
 
+### TraditionalCollectionView
+
+For layouts that `UICollectionViewCompositionalLayout` cannot express (flow/tag-cloud, circular, physics-based), use `TraditionalCollectionView` with any `UICollectionViewLayout` subclass:
+
+```swift
+let flowLayout = UICollectionViewFlowLayout()
+flowLayout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+
+TraditionalCollectionView(layout: flowLayout) {
+    AnySection(id: .tags, items: tags) { tag in
+        AnyCell(tag, id: tag.id) { TagChipView(tag: $0) }
+    }
+    .header { Header { TagSectionHeader() } }
+    .onSelect { tag in print(tag.name) }
+    .shimmer(count: 6, when: isLoading) { ShimmerPlaceholder() }
+}
+.onRefresh(isRefreshing) { viewModel.refresh() }
+.contentInset(top: 16)
+.emptyState(when: isEmpty) { EmptyTagsView() }
+```
+
+`TraditionalCollectionView` shares the same `AnySection`/`AnyCell` DSL, diffable data source, selection handling, shimmer, and scroll observation as `CollectionView`. The key difference is that layout is provided at init rather than per-section via `.layout{}`.
+
+**Supported modifiers:** `.onSelect`, `.onRoute`, `.header()`, `.footer()`, `.headerHidden(when:)`, `.footerHidden(when:)`, `.shimmer()`, `.contentInset()`, `.onRefresh()`, `.onScroll()`, `.emptyState(when:)`.
+
+**Not applicable** (silently ignored): `.layout{}`, `.decorationItems()`, `.backgroundDecoration()` — these are compositional-layout-specific.
+
 ---
 
 ## Advanced View Structure
