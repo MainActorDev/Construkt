@@ -322,3 +322,85 @@ public class TraditionalCollectionViewWrapperView: UIView, UICollectionViewDeleg
         onDidEndDecelerating?(scrollView)
     }
 }
+
+// MARK: - TraditionalCollectionView Modifiers
+
+public extension TraditionalCollectionView {
+    /// Dynamically swaps the internal collection view display for a custom empty state `View` when the
+    /// bounding binding resolves to `true`.
+    func emptyState<B: ViewBinding>(
+        when binding: B,
+        @ViewResultBuilder _ content: @escaping () -> ViewConvertable
+    ) -> TraditionalCollectionView where B.Value == Bool {
+        let views = content().asViews()
+        let view = VStackView(views)
+            .alignment(.center)
+            .build()
+        modifiableView.emptyStateProvider = { view }
+
+        binding
+            .distinctUntilChanged()
+            .observe(on: .main) { [weak modifiableView] show in
+                modifiableView?.updateEmptyState(show: show)
+            }
+            .store(in: modifiableView.cancelBag)
+
+        return self
+    }
+}
+
+public extension ModifiableView where Base: TraditionalCollectionViewWrapperView {
+
+    /// Adjusts the internal scroll view's content inset.
+    @discardableResult
+    func contentInset(
+        top: CGFloat = 0,
+        left: CGFloat = 0,
+        bottom: CGFloat = 0,
+        right: CGFloat = 0
+    ) -> ViewModifier<Base> {
+        modifiableView.collectionView.contentInset = .init(top: top, left: left, bottom: bottom, right: right)
+        return ViewModifier(modifiableView)
+    }
+
+    /// Installs a `UIRefreshControl` directly into the collection view, binding its active state
+    /// to a specific boolean binding.
+    @discardableResult
+    func onRefresh<B: ViewBinding>(_ binding: B, action: @escaping () -> Void) -> ViewModifier<Base> where B.Value == Bool {
+        modifiableView.setupRefreshControl(action: action)
+
+        binding.observe(on: .main) { [weak modifiableView] isRefreshing in
+            modifiableView?.setRefreshing(isRefreshing)
+        }.store(in: modifiableView.cancelBag)
+
+        return ViewModifier(modifiableView)
+    }
+
+    /// Forwarded `UIScrollViewDelegate` scroll event.
+    @discardableResult
+    func onScroll(_ handler: @escaping (UIScrollView) -> Void) -> ViewModifier<Base> {
+        modifiableView.onScroll = handler
+        return ViewModifier(modifiableView)
+    }
+
+    /// Forwarded `UIScrollViewDelegate` scroll view delegate will begin dragging.
+    @discardableResult
+    func onWillBeginDragging(_ handler: @escaping (UIScrollView) -> Void) -> ViewModifier<Base> {
+        modifiableView.onWillBeginDragging = handler
+        return ViewModifier(modifiableView)
+    }
+
+    /// Forwarded `UIScrollViewDelegate` did end dragging.
+    @discardableResult
+    func onDidEndDragging(_ handler: @escaping (UIScrollView, Bool) -> Void) -> ViewModifier<Base> {
+        modifiableView.onDidEndDragging = handler
+        return ViewModifier(modifiableView)
+    }
+
+    /// Forwarded `UIScrollViewDelegate` did end decelerating.
+    @discardableResult
+    func onDidEndDecelerating(_ handler: @escaping (UIScrollView) -> Void) -> ViewModifier<Base> {
+        modifiableView.onDidEndDecelerating = handler
+        return ViewModifier(modifiableView)
+    }
+}
