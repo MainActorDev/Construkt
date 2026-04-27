@@ -70,7 +70,7 @@ public struct TraditionalCollectionView: ModifiableView {
 
 /// The internal `UIView` subclass responsible for hosting the actual `UICollectionView`
 /// with a user-provided `UICollectionViewLayout` and maintaining the Diffable Data Source mappings.
-public class TraditionalCollectionViewWrapperView: UIView, UICollectionViewDelegate {
+public class TraditionalCollectionViewWrapperView: UIView, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
 
     /// A zero-height supplementary view returned when a header/footer is hidden.
     private final class EmptySupplementaryView: UICollectionReusableView {}
@@ -200,6 +200,38 @@ public class TraditionalCollectionViewWrapperView: UIView, UICollectionViewDeleg
 
     public func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
         adapter.collectionView(collectionView, cancelPrefetchingForItemsAt: indexPaths)
+    }
+
+    // MARK: - Flow Layout Delegate
+
+    public func collectionView(
+        _ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        referenceSizeForHeaderInSection section: Int
+    ) -> CGSize {
+        guard collectionViewLayout is UICollectionViewFlowLayout else { return .zero }
+        guard let identifier = dataSource.sectionIdentifier(at: section),
+              let sectionConfig = currentSectionMap[identifier],
+              let header = sectionConfig.header,
+              !header.isHidden else {
+            return .zero
+        }
+        return CGSize(width: collectionView.bounds.width, height: 44)
+    }
+
+    public func collectionView(
+        _ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        referenceSizeForFooterInSection section: Int
+    ) -> CGSize {
+        guard collectionViewLayout is UICollectionViewFlowLayout else { return .zero }
+        guard let identifier = dataSource.sectionIdentifier(at: section),
+              let sectionConfig = currentSectionMap[identifier],
+              let footer = sectionConfig.footer,
+              !footer.isHidden else {
+            return .zero
+        }
+        return CGSize(width: collectionView.bounds.width, height: 44)
     }
 
     // MARK: - Empty State
