@@ -112,6 +112,90 @@ struct TraditionalCollectionViewTests {
         )
         #expect(size == .zero)
     }
+
+    @Test("update populates data source with sections and cells")
+    func updatePopulatesDataSource() {
+        let flowLayout = UICollectionViewFlowLayout()
+
+        let wrapper = TraditionalCollectionViewWrapperView(layout: flowLayout)
+
+        let bag = CancelBag()
+        var sections: [SectionConfig] = []
+
+        AnySection(id: TestSection.tags) {
+            AnyCell("tag1", id: "t1") { _ in ContainerView() }
+            AnyCell("tag2", id: "t2") { _ in ContainerView() }
+        }
+        .asAnySectionObservable()
+        .observe(on: nil) { s in sections = s }
+        .store(in: bag)
+
+        wrapper.update(sections: sections)
+
+        let snapshot = wrapper.collectionView.dataSource as! AnyCollectionDiffableDataSource
+        let snap = snapshot.snapshot()
+        #expect(snap.numberOfSections == 1)
+        #expect(snap.numberOfItems(inSection: snap.sectionIdentifiers[0]) == 2)
+    }
+
+    @Test("multiple sections are all present in data source")
+    func multipleSectionsPresent() {
+        let flowLayout = UICollectionViewFlowLayout()
+
+        let wrapper = TraditionalCollectionViewWrapperView(layout: flowLayout)
+
+        let bag = CancelBag()
+        var sections1: [SectionConfig] = []
+        var sections2: [SectionConfig] = []
+
+        AnySection(id: TestSection.tags) {
+            AnyCell("tag1", id: "t1") { _ in ContainerView() }
+        }
+        .asAnySectionObservable()
+        .observe(on: nil) { s in sections1 = s }
+        .store(in: bag)
+
+        AnySection(id: TestSection.items) {
+            AnyCell("item1", id: "i1") { _ in ContainerView() }
+            AnyCell("item2", id: "i2") { _ in ContainerView() }
+            AnyCell("item3", id: "i3") { _ in ContainerView() }
+        }
+        .asAnySectionObservable()
+        .observe(on: nil) { s in sections2 = s }
+        .store(in: bag)
+
+        wrapper.update(sections: sections1 + sections2)
+
+        let snapshot = wrapper.collectionView.dataSource as! AnyCollectionDiffableDataSource
+        let snap = snapshot.snapshot()
+        #expect(snap.numberOfSections == 2)
+        #expect(snap.numberOfItems(inSection: snap.sectionIdentifiers[0]) == 1)
+        #expect(snap.numberOfItems(inSection: snap.sectionIdentifiers[1]) == 3)
+    }
+
+    @Test("sectionController returns correct section for index")
+    func sectionControllerLookup() {
+        let flowLayout = UICollectionViewFlowLayout()
+
+        let wrapper = TraditionalCollectionViewWrapperView(layout: flowLayout)
+
+        let bag = CancelBag()
+        var sections: [SectionConfig] = []
+
+        AnySection(id: TestSection.tags) {
+            AnyCell("tag1", id: "t1") { _ in ContainerView() }
+        }
+        .asAnySectionObservable()
+        .observe(on: nil) { s in sections = s }
+        .store(in: bag)
+
+        wrapper.update(sections: sections)
+
+        let section = wrapper.sectionController(for: 0)
+        #expect(section != nil)
+        #expect(section?.identifier.uniqueId == TestSection.tags.uniqueId)
+        #expect(wrapper.sectionController(for: 1) == nil)
+    }
 }
 
 private enum TestSection: SectionConfigIdentifier {
