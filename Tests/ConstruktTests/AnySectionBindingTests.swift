@@ -2,7 +2,6 @@ import Testing
 @testable import ConstruktKit
 
 @Suite("AnySection Bindings")
-@MainActor
 struct AnySectionBindingTests {
 
     @Test("when binding toggles section visibility")

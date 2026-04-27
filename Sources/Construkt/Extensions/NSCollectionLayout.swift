@@ -85,43 +85,6 @@ public struct CollectionLayoutSectionBuilder {
         return CollectionLayoutSectionBuilder(section: section)
     }
     
-    /// Creates a wrapping flow layout where items have variable widths and wrap to the next line.
-    ///
-    /// This is ideal for tag clouds, chip groups, or any layout where items have different widths
-    /// and should flow left-to-right with line wrapping.
-    ///
-    /// - Parameters:
-    ///   - itemSizes: Pre-measured sizes for each item. The count must match the number of items in the section.
-    ///   - horizontalSpacing: Horizontal gap between items on the same line. Default 8.
-    ///   - lineSpacing: Vertical gap between lines. Default 8.
-    /// - Returns: A configured `CollectionLayoutSectionBuilder`.
-    public static func flow(
-        itemSizes: [CGSize],
-        horizontalSpacing: CGFloat = 8,
-        lineSpacing: CGFloat = 8
-    ) -> CollectionLayoutSectionBuilder {
-        // Use estimated height — UIKit will derive actual height from custom item frames.
-        let groupSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .estimated(44)
-        )
-
-        let group = NSCollectionLayoutGroup.custom(layoutSize: groupSize) { environment in
-            let containerWidth = environment.container.effectiveContentSize.width
-            let frames = FlowLayoutCalculator.computeFrames(
-                itemSizes: itemSizes,
-                containerWidth: containerWidth,
-                horizontalSpacing: horizontalSpacing,
-                lineSpacing: lineSpacing
-            )
-            return frames.map { NSCollectionLayoutGroupCustomItem(frame: $0) }
-        }
-
-        let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = 0
-        return CollectionLayoutSectionBuilder(section: section)
-    }
-    
     // MARK: - Modifiers
     
     @discardableResult
