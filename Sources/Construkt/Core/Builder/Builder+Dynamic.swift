@@ -96,7 +96,7 @@ public class DynamicItemViewBuilder<Item>: AnyIndexableViewBuilder {
 
 }
 
-/// A reactive builder component that maps an RxSwift `Observable` emission to a dynamically rebuilt view.
+/// A reactive builder component that maps a `ViewBinding` emission to a dynamically rebuilt view.
 public class DynamicObservableViewBuilder<Value>: AnyIndexableViewBuilder {
 
     public var count: Int { view == nil ? 0 : 1 }

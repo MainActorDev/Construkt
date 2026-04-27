@@ -25,7 +25,6 @@
 //
 
 import UIKit
-import SwiftUI
 
 
 /// A builder component that constructs a horizontal `UIStackView`.
@@ -42,6 +41,7 @@ public struct HStackView: ModifiableView {
     
     // lifecycle
     public init(spacing: CGFloat = UIStackView.spacingUseSystem, @ViewResultBuilder _ builder: () -> ViewConvertable) {
+        modifiableView.spacing = spacing
         builder().asViews().forEach { modifiableView.addArrangedSubview($0) }
     }
     

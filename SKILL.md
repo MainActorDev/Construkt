@@ -43,6 +43,8 @@ When generating UI, use the Construkt primitives:
 | `BlurView` / `UIVisualEffectView` | `BlurView(style: .regular)` |
 | `List` / `UITableView` | `TableView(DynamicItemViewBuilder) { ... }` |
 | `LazyVGrid`/`UICollectionView` | `CollectionView { AnySection { ... } }` |
+| Flow/tag cloud layout | `.layout { CollectionLayoutSectionBuilder.flow(itemSizes:) }` |
+| Custom collection layout | `CollectionView { ... }.customLayout(myLayout)` |
 | Screen layout container | `Screen { content }.navigationBar { bar }` |
 
 ---
@@ -192,7 +194,70 @@ CollectionView {
 }
 ```
 
-### 3. Shimmer Loading States
+### 3. Flow Layouts (Tag Clouds / Chip Lists)
+For variable-width items that wrap to the next line, use the `.flow()` layout factory on `CollectionLayoutSectionBuilder`. This works within the standard compositional layout — other sections can use `.list()`, `.grid()`, or `.carousel()` as usual.
+
+```swift
+AnySection(id: "tags", items: tags) { tag in
+    AnyCell(tag, id: tag.id) { tag in
+        TagChipCell(tag: tag)
+    }
+}
+.layout {
+    CollectionLayoutSectionBuilder.flow(
+        itemSizes: tags.map { $0.chipSize }, // Pre-measured [CGSize]
+        horizontalSpacing: 8,
+        lineSpacing: 8
+    )
+    .insets(top: 16, leading: 16, bottom: 16, trailing: 16)
+}
+```
+
+> **Important:** You must pre-measure item sizes before passing them to `.flow()`. The layout calculator needs widths upfront to compute wrapping positions.
+
+### 4. Custom Collection View Layouts
+For layouts that can't be expressed with compositional layout, bypass it entirely with `.customLayout()`:
+
+```swift
+let flowLayout = UICollectionViewFlowLayout()
+flowLayout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+
+CollectionView {
+    AnySection(id: "items") { ... }
+}
+.customLayout(flowLayout)
+```
+
+When `.customLayout()` is set, per-section `.layout {}` modifiers are ignored — the custom layout governs the entire collection view.
+
+For custom layouts that need Construkt's section/item metadata, conform to `ConstruktCollectionLayout`:
+
+```swift
+class MyLayout: UICollectionViewLayout, ConstruktCollectionLayout {
+    private var metadata: CollectionLayoutMetadata?
+
+    func updateMetadata(_ metadata: CollectionLayoutMetadata) {
+        self.metadata = metadata
+        invalidateLayout()
+    }
+    // implement prepare(), layoutAttributesForElements(in:), etc.
+}
+```
+
+Construkt includes a built-in `FlowCollectionViewLayout` for wrapping flow layouts:
+
+```swift
+let flowLayout = FlowCollectionViewLayout { indexPath, metadata in
+    return CGSize(width: computedWidth, height: 32)
+}
+flowLayout.horizontalSpacing = 8
+flowLayout.sectionInsets = NSDirectionalEdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+
+CollectionView { ... }
+    .customLayout(flowLayout)
+```
+
+### 5. Shimmer Loading States
 Construkt supports natively swapping an entire `AnySection` with shimmer placeholders during load times. Use the `.shimmer(count:when:...)` modifier directly on the Section:
 
 ```swift
@@ -537,6 +602,8 @@ ZStackView { ... }.hideKeyboardOnBackgroundTap()
 3. **Never write `setupConstraints()` or use `translatesAutoresizingMaskIntoConstraints = false`.**
 4. **Never create generic constraint arrays.** 
 5. **Never write `UICollectionViewDataSource` logic.** Use `CollectionView` ResultBuilders.
+6. **Never implement `UICollectionViewLayout` subclasses for simple flow/wrapping layouts.** Use `.layout { CollectionLayoutSectionBuilder.flow(itemSizes:) }` instead. Only use `.customLayout()` when the layout truly can't be expressed with compositional layout.
+7. **Never use `.layout {}` modifiers on sections when `.customLayout()` is set on the `CollectionView`.** The custom layout governs the entire collection view; per-section layout providers are ignored.
 
 ---
 
@@ -590,3 +657,54 @@ When generating ConstruktKit code, AI often hallucinates SwiftUI equivalents. If
 3. Wrong modifier signatures (e.g. wrong padding parameters or `.border` arguments)
 4. Wrong component initializer signatures (e.g. `SpacerView(width:)` instead of `FixedSpacerView(width:)`)
 5. Using `ZStackView` + `.position(.top)` for nav bars instead of `Screen { ... }.navigationBar { ... }`
+
+---
+
+### Feature Composition
+
+**Pattern: Parent-child reducer delegation**
+```swift
+case .child(let childIntent):
+    let childResult = ChildFeature.reduce(state: &state.child, intent: childIntent)
+    return childResult.map(
+        effect: { Effect.child($0) },
+        output: { Output.child($0) }
+    )
+```
+
+**Pattern: Effect executor delegation**
+```swift
+case .child(let childEffect):
+    let childFeedback = try await childExecutor(childEffect, deps.childDeps)
+    return childFeedback.map(intent: { .child($0) }, output: { .child($0) })
+```
+
+**Pattern: Policy delegation**
+```swift
+case .child(let childEffect):
+    return ChildFeature.policy(for: childEffect)
+```
+
+**Anti-pattern: Forgetting to map child types**
+```swift
+// WRONG: Returns ReduceResult<ChildEffect, ChildOutput> — type mismatch
+case .child(let childIntent):
+    return ChildFeature.reduce(state: &state.child, intent: childIntent)
+
+// RIGHT: Map to parent types
+case .child(let childIntent):
+    return ChildFeature.reduce(state: &state.child, intent: childIntent)
+        .map(effect: { .child($0) }, output: { .child($0) })
+```
+
+**Anti-pattern: Creating separate FeatureStore for child**
+```swift
+// WRONG: Child runs in its own runtime — no composition
+let childStore = FeatureStore<ChildFeature>(...)
+let parentStore = FeatureStore<ParentFeature>(...)
+
+// RIGHT: Single parent store, child state embedded
+let store = FeatureStore<ParentFeature>(...)
+store.dispatch(.child(.loadProfile))
+store.state.map(\.child.username)  // observe child state through parent
+```

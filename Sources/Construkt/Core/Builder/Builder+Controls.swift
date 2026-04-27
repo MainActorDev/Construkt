@@ -50,13 +50,13 @@ extension ModifiableView where Base: UIControl {
     /// Sets the `isHighlighted` state of the control.
     @discardableResult
     public func highlighted(_ highlighted: Bool) -> ViewModifier<Base> {
-        ViewModifier(modifiableView, keyPath: \.isEnabled, value: highlighted)
+        ViewModifier(modifiableView, keyPath: \.isHighlighted, value: highlighted)
     }
 
     /// Sets the `isSelected` state of the control.
     @discardableResult
     public func selected(_ selected: Bool) -> ViewModifier<Base> {
-        ViewModifier(modifiableView, keyPath: \.isEnabled, value: selected)
+        ViewModifier(modifiableView, keyPath: \.isSelected, value: selected)
     }
 
 }

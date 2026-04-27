@@ -105,6 +105,7 @@ extension ModifiableView where Base: BuilderInternalScrollView {
       ViewModifier(modifiableView, keyPath: \.showsVerticalScrollIndicator, value: show)
     }
 
+    /// Sets whether the horizontal scroll indicator is visible.
     @discardableResult
     public func showHorizontalIndicator(_ show: Bool) -> ViewModifier<Base> {
       ViewModifier(modifiableView, keyPath: \.showsHorizontalScrollIndicator, value: show)

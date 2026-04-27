@@ -170,6 +170,7 @@ extension ModifiableView where Base: UITextField {
 
 /// Extension providing declarative subscription mapping to `UITextField` control events.
 extension ModifiableView where Base: UITextField {
+    @discardableResult
     public func onControlEvent(_ event: UIControl.Event,
                                handler: @escaping (_ context: ViewBuilderValueContext<UITextField, String?>) -> Void) -> ViewModifier<Base> {
         ViewModifier(modifiableView) { textField in

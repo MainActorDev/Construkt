@@ -476,6 +476,47 @@ struct OperatorTests {
     }
 }
 
+// MARK: - EraseToAnyViewBinding Tests
+
+@Suite("EraseToAnyViewBinding Tests")
+@MainActor
+struct EraseToAnyViewBindingTests {
+    @Test("eraseToAnyViewBinding preserves values")
+    func erasedBindingPreservesValues() {
+        let property = Property<Int>(0)
+        let erased = property.eraseToAnyViewBinding()
+        var received: [Int] = []
+        let cancellable = erased.observe(on: nil) { received.append($0) }
+        property.wrappedValue = 1
+        property.wrappedValue = 2
+        #expect(received == [0, 1, 2])
+        cancellable.cancel()
+    }
+
+    @Test("eraseToAnyViewBinding works with operators")
+    func erasedBindingWorksWithOperators() {
+        let property = Property<Int>(0)
+        let erased = property.map { $0 * 2 }.eraseToAnyViewBinding()
+        var received: [Int] = []
+        let cancellable = erased.observe(on: nil) { received.append($0) }
+        property.wrappedValue = 5
+        #expect(received == [0, 10])
+        cancellable.cancel()
+    }
+
+    @Test("eraseToAnyViewBinding cancellation works")
+    func erasedBindingCancellation() {
+        let property = Property<Int>(0)
+        let erased = property.eraseToAnyViewBinding()
+        var received: [Int] = []
+        let cancellable = erased.observe(on: nil) { received.append($0) }
+        property.wrappedValue = 1
+        cancellable.cancel()
+        property.wrappedValue = 2
+        #expect(received == [0, 1])
+    }
+}
+
 // MARK: - Test Helpers
 
 private final class TestCancellable: AnyCancellableLifecycle {

@@ -195,6 +195,37 @@ struct EventRoutingTests {
         #expect(handled == false)
         #expect(received == false)
     }
+    @Test("RouteChannel.shared returns the same instance for the same event type")
+    func testRouteChannelSharedSingleton() {
+        let channel1 = RouteChannel<TestRoute>.shared
+        let channel2 = RouteChannel<TestRoute>.shared
+        #expect(channel1 === channel2)
+    }
+    
+    @Test("RouteChannel.shared returns different instances for different event types")
+    func testRouteChannelSharedDifferentTypes() {
+        let channel1 = RouteChannel<TestRoute>.shared
+        let channel2 = RouteChannel<TestRoute2>.shared
+        // They are different types, so we just verify both are non-nil and functional
+        var received1: TestRoute? = nil
+        var received2: TestRoute2? = nil
+        
+        let owner = NSObject()
+        channel1.subscribe(owner: owner) { event, _ in
+            received1 = event
+            return true
+        }
+        channel2.subscribe(owner: owner) { event, _ in
+            received2 = event
+            return true
+        }
+        
+        channel1.send(.page1)
+        channel2.send(.settings)
+        
+        #expect(received1 == .page1)
+        #expect(received2 == .settings)
+    }
 }
 
 private enum TestRoute2: Equatable {

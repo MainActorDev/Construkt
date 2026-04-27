@@ -45,6 +45,7 @@ extension UIView: ModifiableView {
 
 extension ModifiableView {
 
+    /// Sets an arbitrary property on the underlying view using a key path.
     @discardableResult
     public func set<T>(keyPath: ReferenceWritableKeyPath<Base, T>, value: T) -> ViewModifier<Base> {
         ViewModifier(modifiableView, keyPath: keyPath, value: value)
@@ -103,7 +104,8 @@ extension ModifiableView {
         }
     }
 
-     @discardableResult
+    /// Rounds specific corners of the view using a `UIRectCorner` option set.
+    @discardableResult
     public func roundedCorners(_ radius: CGFloat, corners: UIRectCorner) -> ViewModifier<Base> {
         ViewModifier(modifiableView) {
             var mask: CACornerMask = []
@@ -143,6 +145,7 @@ extension ModifiableView {
         ViewModifier(modifiableView, keyPath: \.isUserInteractionEnabled, value: enabled)
     }
 
+    /// Rounds specific corners of the view using a `CACornerMask` bitmask.
     @discardableResult
     public func roundedCorners(radius: CGFloat, corners: CACornerMask) -> ViewModifier<Base> {
         ViewModifier(modifiableView) {
@@ -169,16 +172,73 @@ extension ModifiableView {
         ViewModifier(modifiableView) { $0.tag = tag.rawValue }
     }
 
+    /// Sets an accessibility identifier for UI testing using a plain string.
+    @discardableResult
+    public func accessibilityIdentifier(_ id: String) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { $0.accessibilityIdentifier = id }
+    }
+
+    /// Sets the view's accessibility hint, providing additional context for assistive technologies.
+    @discardableResult
+    public func accessibilityHint(_ hint: String) -> ViewModifier<Base> {
+        ViewModifier(modifiableView, keyPath: \.accessibilityHint, value: hint)
+    }
+
+    /// Sets the view's accessibility value, representing the current state for assistive technologies.
+    @discardableResult
+    public func accessibilityValue(_ value: String) -> ViewModifier<Base> {
+        ViewModifier(modifiableView, keyPath: \.accessibilityValue, value: value)
+    }
+
+    /// Sets the view's accessibility traits, describing its behavior (e.g. button, link, header).
+    @discardableResult
+    public func accessibilityTraits(_ traits: UIAccessibilityTraits) -> ViewModifier<Base> {
+        ViewModifier(modifiableView, keyPath: \.accessibilityTraits, value: traits)
+    }
+
+    /// Sets whether the view is an accessibility element, making it visible or hidden to assistive technologies.
+    @discardableResult
+    public func isAccessibilityElement(_ isElement: Bool) -> ViewModifier<Base> {
+        ViewModifier(modifiableView, keyPath: \.isAccessibilityElement, value: isElement)
+    }
+
+    /// Sets the view's accessibility identifier using a plain string.
+    @discardableResult
+    public func identifier(_ id: String) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { $0.accessibilityIdentifier = id }
+    }
+
+    /// Associates a specific integer identifier to rapidly retrieve this specific subview instance.
+    @discardableResult
+    public func tag(_ tag: Int) -> ViewModifier<Base> {
+        ViewModifier(modifiableView) { $0.tag = tag }
+    }
+
+    /// Applies an affine transform (rotation, scale, translation) to the view.
+    @discardableResult
+    public func transform(_ transform: CGAffineTransform) -> ViewModifier<Base> {
+        ViewModifier(modifiableView, keyPath: \.transform, value: transform)
+    }
+
+    /// Sets the semantic content attribute, controlling layout direction for right-to-left locales.
+    @discardableResult
+    public func semanticContentAttribute(_ attribute: UISemanticContentAttribute) -> ViewModifier<Base> {
+        ViewModifier(modifiableView, keyPath: \.semanticContentAttribute, value: attribute)
+    }
+
+    /// Sets the tint color of the view, inherited by subviews unless overridden.
     @discardableResult
     public func tintColor(_ color: UIColor) -> ViewModifier<Base> {
         ViewModifier(modifiableView, keyPath: \.tintColor, value: color)
     }
 
+    /// Controls whether the autoresizing mask is translated into Auto Layout constraints.
     @discardableResult
     public func translatesAutoresizingMaskIntoConstraints(_ translate: Bool) -> ViewModifier<Base> {
         ViewModifier(modifiableView, keyPath: \.translatesAutoresizingMaskIntoConstraints, value: translate)
     }
 
+    /// Enables or disables user interaction on the view. Alias for `isUserInteractionEnabled`.
     @discardableResult
     public func userInteractionEnabled(_ enabled: Bool) -> ViewModifier<Base> {
         ViewModifier(modifiableView, keyPath: \.isUserInteractionEnabled, value: enabled)
@@ -190,11 +250,13 @@ extension ModifiableView {
 
 extension ModifiableView {
     
+    /// Reactively binds the view's `isHidden` property to a `ViewBinding<Bool>`.
     @discardableResult
     public func hidden<Binding:ViewBinding>(bind binding: Binding) -> ViewModifier<Base> where Binding.Value == Bool {
         ViewModifier(modifiableView, binding: binding, keyPath: \.isHidden)
     }
 
+    /// Reactively binds the view's `isUserInteractionEnabled` property to a `ViewBinding<Bool>`.
     @discardableResult
     public func userInteractionEnabled<Binding:ViewBinding>(bind binding: Binding) -> ViewModifier<Base> where Binding.Value == Bool {
         ViewModifier(modifiableView, binding: binding, keyPath: \.isUserInteractionEnabled)

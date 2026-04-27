@@ -85,7 +85,10 @@ struct FeatureStoreTests {
     }
 
     private func makeStore() -> FeatureStore<FeatureStoreTestFeature> {
-        FeatureStore(dependencies: .init()) { effect, _ in
+        FeatureStore(
+            dependencies: .init(),
+            deliveryQueue: DispatchQueue(label: "test.feature-store")
+        ) { effect, _ in
             switch effect {
             case .none:
                 return .none

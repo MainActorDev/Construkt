@@ -26,11 +26,14 @@
   - [Runtime Scope and Lifecycle](#runtime-scope-and-lifecycle)
   - [Runtime Journal for Debugging](#runtime-journal-for-debugging)
   - [Testing Runtime Features](#testing-runtime-features)
+  - [Feature Composition](#feature-composition)
 - [Modern Collection and Table Views](#modern-collection-and-table-views)
   - [Table Views](#table-views)
   - [Dynamic Collection Views](#dynamic-collection-views)
   - [Static Collection Views](#static-collection-views)
   - [Shimmer Loading States](#shimmer-loading-states)
+  - [Flow Layouts (Tag Clouds / Chip Lists)](#flow-layouts-tag-clouds--chip-lists)
+  - [Custom Collection View Layouts](#custom-collection-view-layouts)
 - [Advanced View Structure](#advanced-view-structure)
 - [Navigation & Auto-Routing](#navigation--auto-routing)
   - [Coordinators](#coordinators)
@@ -496,6 +499,150 @@ Recommended testing split:
 
 For flows that depend on settled async state, prefer `sendAndDrain` in tests.
 
+### Feature Composition
+
+Construkt supports composing parent and child features using type-mapping methods on `ReduceResult` and `EffectFeedback`. The parent feature embeds the child's state, intents, and effects, then delegates to the child's reducer and effect executor.
+
+#### Defining Parent and Child
+
+```swift
+// Child feature
+enum ProfileFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var username: String = ""
+        var isLoading: Bool = false
+    }
+    enum Intent: Sendable {
+        case loadProfile
+        case profileLoaded(String)
+    }
+    enum Effect: Sendable, Hashable {
+        case fetchProfile
+    }
+    enum Output: Sendable {
+        case didLogOut
+    }
+    struct Dependencies: Sendable {
+        let api: ProfileAPI
+    }
+
+    static var initialState: State { State() }
+
+    static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+        switch intent {
+        case .loadProfile:
+            state.isLoading = true
+            return ReduceResult(effects: [.fetchProfile])
+        case .profileLoaded(let name):
+            state.username = name
+            state.isLoading = false
+            return .none
+        }
+    }
+
+    static func policy(for effect: Effect) -> EffectPolicy {
+        .latest("fetchProfile")
+    }
+}
+
+// Parent embeds child
+enum AppFeature: FeatureSpec {
+    struct State: Sendable, Equatable {
+        var profile: ProfileFeature.State = ProfileFeature.initialState  // embed child state
+        var sessionCount: Int = 0
+    }
+    enum Intent: Sendable {
+        case profile(ProfileFeature.Intent)  // wrap child intents
+        case incrementSession
+    }
+    enum Effect: Sendable, Hashable {
+        case profile(ProfileFeature.Effect)  // wrap child effects
+    }
+    enum Output: Sendable {
+        case profile(ProfileFeature.Output)  // wrap child outputs
+    }
+    // ...
+}
+```
+
+#### Reducer Composition
+
+In the parent reducer, delegate to the child reducer and map the result:
+
+```swift
+static func reduce(state: inout State, intent: Intent) -> ReduceResult<Effect, Output> {
+    switch intent {
+    case .profile(let childIntent):
+        // 1. Delegate to child
+        let childResult = ProfileFeature.reduce(state: &state.profile, intent: childIntent)
+
+        // 2. Map child types to parent types
+        var result = childResult.map(
+            effect: { Effect.profile($0) },
+            output: { Output.profile($0) }
+        )
+
+        // 3. Parent can observe and react
+        if case .profileLoaded = childIntent {
+            state.sessionCount += 1
+        }
+
+        return result
+
+    case .incrementSession:
+        state.sessionCount += 1
+        return .none
+    }
+}
+```
+
+#### Effect Executor Composition
+
+Compose effect executors by delegating child effects and mapping feedback:
+
+```swift
+let appExecutor: FeatureEffectExecutor<AppFeature> = { effect, deps in
+    switch effect {
+    case .profile(let childEffect):
+        let childFeedback = try await profileExecutor(childEffect, deps.profileDeps)
+        return childFeedback.map(
+            intent: { .profile($0) },
+            output: { .profile($0) }
+        )
+    case .trackSession:
+        // parent's own effect
+        return .none
+    }
+}
+```
+
+#### Policy Delegation
+
+Delegate effect policies to the child feature:
+
+```swift
+static func policy(for effect: Effect) -> EffectPolicy {
+    switch effect {
+    case .profile(let childEffect):
+        return ProfileFeature.policy(for: childEffect)
+    case .trackSession:
+        return .concurrent
+    }
+}
+```
+
+#### Composition API Reference
+
+| Method | Purpose |
+|--------|---------|
+| `ReduceResult.map(effect:output:)` | Transform child reduce result to parent types |
+| `ReduceResult.mapEffects(_:)` | Map only effects, preserve output type |
+| `ReduceResult.mapOutputs(_:)` | Map only outputs, preserve effect type |
+| `ReduceResult.merged(with:)` | Combine two reduce results |
+| `EffectFeedback.map(intent:output:)` | Transform child effect feedback to parent types |
+| `EffectFeedback.mapIntents(_:)` | Map only intents, preserve output type |
+| `EffectFeedback.mapOutputs(_:)` | Map only outputs, preserve intent type |
+
 ---
 
 ## Modern Collection and Table Views
@@ -603,6 +750,75 @@ AnySection(id: "popular", items: movies) { movie in
 ```
 
 When `isLoading` is true, Construkt automatically generates 5 shimmer placeholder geometries based on your ViewBuilder structure and animates a shimmer gradient across them. When the data loads, it cross-dissolves them back to your actual fetched data natively.
+
+### Flow Layouts (Tag Clouds / Chip Lists)
+
+For variable-width items that wrap to the next line (tag clouds, chip lists, filter bars), use the `.flow()` layout factory. This works within the standard compositional layout — other sections in the same `CollectionView` can use `.list()`, `.grid()`, or `.carousel()` as usual.
+
+```swift
+CollectionView {
+    AnySection(id: "tags", items: tags) { tag in
+        AnyCell(tag, id: tag.id) { tag in
+            TagChipCell(tag: tag)
+        }
+    }
+    .layout {
+        CollectionLayoutSectionBuilder.flow(
+            itemSizes: tags.map { $0.chipSize }, // Pre-measured CGSize per item
+            horizontalSpacing: 8,
+            lineSpacing: 8
+        )
+        .insets(top: 16, leading: 16, bottom: 16, trailing: 16)
+    }
+}
+```
+
+> **Note:** You must pre-measure item sizes before passing them to `.flow()`. The layout calculator needs widths upfront to compute wrapping positions. A common pattern is to compute sizes from your model data (e.g., measuring text width + padding).
+
+### Custom Collection View Layouts
+
+For layouts that can't be expressed with `UICollectionViewCompositionalLayout` (e.g., circular layouts, physics-based layouts, Pinterest-style waterfall), you can bypass the compositional layout entirely and supply your own `UICollectionViewLayout` subclass:
+
+```swift
+let flowLayout = UICollectionViewFlowLayout()
+flowLayout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+
+CollectionView {
+    AnySection(id: "items") { ... }
+}
+.customLayout(flowLayout)
+```
+
+When `.customLayout()` is set, the compositional layout is not created. Per-section `.layout {}` modifiers are ignored — the custom layout governs the entire collection view.
+
+**Protocol-aware custom layouts:** If your custom layout needs to know about Construkt's section/item structure, conform to `ConstruktCollectionLayout`. Construkt will automatically call `updateMetadata(_:)` whenever the data source updates:
+
+```swift
+class MyCustomLayout: UICollectionViewLayout, ConstruktCollectionLayout {
+    private var metadata: CollectionLayoutMetadata?
+
+    func updateMetadata(_ metadata: CollectionLayoutMetadata) {
+        self.metadata = metadata
+        invalidateLayout()
+    }
+
+    // implement prepare(), layoutAttributesForElements(in:), etc.
+}
+```
+
+Construkt includes a built-in `FlowCollectionViewLayout` as a reference implementation — a full `UICollectionViewLayout` subclass for wrapping flow layouts with configurable spacing, section insets, and a closure-based item size provider:
+
+```swift
+let flowLayout = FlowCollectionViewLayout { indexPath, metadata in
+    return CGSize(width: computedWidth, height: 32)
+}
+flowLayout.horizontalSpacing = 8
+flowLayout.lineSpacing = 12
+flowLayout.sectionInsets = NSDirectionalEdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+
+CollectionView { ... }
+    .customLayout(flowLayout)
+```
 
 ---
 

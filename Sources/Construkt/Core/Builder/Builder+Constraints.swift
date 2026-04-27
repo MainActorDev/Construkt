@@ -88,16 +88,19 @@ extension ModifiableView {
         self.height(height, priority: UILayoutPriority(999))
     }
     
+    /// Constrains both the width and height of the view to exact constants.
     @discardableResult
     public func size(width: CGFloat, height: CGFloat) -> ViewModifier<Base> {
         self.width(width).height(height)
     }
     
+    /// Constrains the height of the view at a specific priority (float form).
     @discardableResult
     public func height(_ height: CGFloat, priority: Float) -> ViewModifier<Base> {
         self.height(height, priority: UILayoutPriority(priority))
     }
     
+    /// Constrains the height of the view at a specific `UILayoutPriority`.
     @discardableResult
     public func height(_ height: CGFloat, priority: UILayoutPriority) -> ViewModifier<Base> {
         ViewModifier(modifiableView) {
@@ -109,6 +112,7 @@ extension ModifiableView {
         }
     }
     
+    /// Constrains the view to a minimum height.
     @discardableResult
     public func height(min height: CGFloat, priority: UILayoutPriority = UILayoutPriority(rawValue: 999)) -> ViewModifier<Base> {
         ViewModifier(modifiableView) {
@@ -120,6 +124,7 @@ extension ModifiableView {
         }
     }
     
+    /// Constrains the view to a maximum height.
     @discardableResult
     public func height(max height: CGFloat, priority: UILayoutPriority = UILayoutPriority(rawValue: 999)) -> ViewModifier<Base> {
         ViewModifier(modifiableView) {
@@ -185,6 +190,7 @@ extension ModifiableView {
         }
     }
     
+    /// Constrains the view to a maximum width.
     @discardableResult
     public func width(max width: CGFloat, priority: UILayoutPriority = UILayoutPriority(rawValue: 999)) -> ViewModifier<Base> {
         ViewModifier(modifiableView) {
@@ -196,6 +202,7 @@ extension ModifiableView {
         }
     }
     
+    /// Sets the z-axis position of the view's layer, controlling visual stacking order.
     @discardableResult
     public func zIndex(_ position: CGFloat) -> ViewModifier<Base> {
         ViewModifier(modifiableView) { $0.layer.zPosition = position }
@@ -344,21 +351,25 @@ extension UILayoutGuide: UIViewAnchoring {}
 extension UIView: UIViewAnchoring {}
 
 extension NSLayoutConstraint {
+    /// Activates or deactivates this constraint and returns `self` for chaining.
     @discardableResult
     public func activate(_ isActive: Bool = true) -> Self {
         self.isActive = isActive
         return self
     }
+    /// Sets a debug identifier on this constraint and returns `self` for chaining.
     @discardableResult
     public func identifier(_ identifier: String?) -> Self {
         self.identifier = identifier
         return self
     }
+    /// Sets the layout priority on this constraint and returns `self` for chaining.
     @discardableResult
     public func priority(_ priority: UILayoutPriority) -> Self {
         self.priority = priority
         return self
     }
+    /// Sets the layout priority using a raw float value and returns `self` for chaining.
     @discardableResult
     public func priority(_ priority: Float) -> Self {
         self.priority = UILayoutPriority(rawValue: priority)

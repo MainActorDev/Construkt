@@ -49,10 +49,12 @@ public final class Property<T>: MutableViewBinding {
         }
     }
     
+    /// Creates a new property with the given initial value.
     public init(_ value: T) {
         self._value = value
     }
     
+    /// Subscribes to value changes, immediately emitting the current value to the new observer.
     public func observe(on queue: DispatchQueue? = .main, _ handler: @escaping (T) -> Void) -> AnyCancellableLifecycle {
         lock.lock()
         defer { lock.unlock() }

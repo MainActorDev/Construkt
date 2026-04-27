@@ -284,16 +284,16 @@ extension ModifiableView {
     /// Configures the view to support `_ShimmerView` loading states.
     ///
     /// - Parameters:
-    ///   - is_ShimmerAble: A boolean enabling shimmer animations on this view.
+    ///   - isShimmerable: A boolean enabling shimmer animations on this view.
     ///   - bgColor: The background color used during the shimmer state.
     /// - Returns: A modified view wrapper.
     @discardableResult
     public func shimmerable(
-        _ is_ShimmerAble: Bool,
+        _ isShimmerable: Bool,
         bgColor: UIColor = UIColor(white: 0.90, alpha: 1.0)
     ) -> ViewModifier<Base> {
         ViewModifier(modifiableView) {
-            $0.isShimmerable = is_ShimmerAble
+            $0.isShimmerable = isShimmerable
             $0.shimmerConfig = .init(
                 background: bgColor,
                 pausesOnBackground: false
