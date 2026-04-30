@@ -143,9 +143,30 @@ public class BuilderInternalScrollView: UIScrollView, UIScrollViewDelegate {
     fileprivate var padding: UIEdgeInsets = .zero
     fileprivate var position: EmbedPosition = .fill
     fileprivate var safeArea: Bool = false
+    
+    /// Guards against infinite layout loops caused by SwiftUI's HostingScrollViewsCache
+    /// repeatedly triggering `setNeedsLayout` after each `layoutSubviews` pass.
+    /// Allows a generous number of layout passes per batch, then suppresses further
+    /// calls until the next run-loop tick resets the counter.
+    private var layoutPassCount = 0
+    private static let maxLayoutPassesPerBatch = 20
 
     @objc public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         scrollViewDidScrollHandler?(ViewBuilderContext(view: self))
+    }
+    
+    override public func layoutSubviews() {
+        layoutPassCount += 1
+        if layoutPassCount > Self.maxLayoutPassesPerBatch {
+            return
+        }
+        if layoutPassCount == 1 {
+            // Schedule a reset for the next run-loop tick
+            DispatchQueue.main.async { [weak self] in
+                self?.layoutPassCount = 0
+            }
+        }
+        super.layoutSubviews()
     }
 
     override public func didMoveToWindow() {
