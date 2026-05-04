@@ -23,6 +23,33 @@ extension RenderItem: CellContentWrapper {
     }
 }
 
+// MARK: - Equatable & Hashable Conformance
+
+extension RenderItem: Equatable where T: Equatable {
+    public static func == (lhs: RenderItem, rhs: RenderItem) -> Bool {
+        switch (lhs, rhs) {
+        case (.data(let l), .data(let r)):
+            return l == r
+        case (.placeholder, .placeholder):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+extension RenderItem: Hashable where T: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .data(let value):
+            hasher.combine(0)
+            hasher.combine(value)
+        case .placeholder:
+            hasher.combine(1)
+        }
+    }
+}
+
 // MARK: - Array Extension for Sections
 
 public extension Array {
