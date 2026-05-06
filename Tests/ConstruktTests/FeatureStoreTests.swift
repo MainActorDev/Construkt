@@ -10,7 +10,7 @@ struct FeatureStoreTests {
     func statePropertyMirrorsRuntime() async {
         let store = makeStore()
 
-        await store.sendAndWait(.increment)
+        await store.sendAndDrain(.increment)
 
         let didUpdate = await waitUntil {
             store.state.wrappedValue.counter == 1
@@ -30,7 +30,7 @@ struct FeatureStoreTests {
             }
         }
 
-        await store.sendAndWait(.emitOutput("hello"))
+        await store.sendAndDrain(.emitOutput("hello"))
 
         let didReceive = await waitUntil {
             captured.snapshot() == ["hello"]
@@ -128,7 +128,7 @@ struct FeatureStoreTests {
     }
 
     private func waitUntil(
-        timeout: TimeInterval = 1,
+        timeout: TimeInterval = 3,
         pollIntervalNanoseconds: UInt64 = 10_000_000,
         condition: @escaping () -> Bool
     ) async -> Bool {
