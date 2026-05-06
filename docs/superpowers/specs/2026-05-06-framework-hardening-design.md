@@ -346,21 +346,35 @@ mutating func append(_ event: ...) {
 
 ---
 
-## Implementation Order
+## Implementation Order (Revised)
 
 ```
-Phase A (Tier 1-2 bugs):
-  A1 → A2 → A3 → A4 → A5 → A6  (correctness, ~3 days)
-  A7 → A8 → A9 → A10 → A11 → A12  (memory/lifecycle, ~2 days)
+Phase A — Safe fixes (zero/low regression risk):
+  A1 (sheet onDismiss)     — additive wiring
+  A2 (toast containment)   — additive containment
+  A4 (delay shadowing)     — 0 consumers
+  A5 (flatMapLatest lock)  — 0 consumers
+  A3 (.onRoute cleanup)    — 2 test sites, fix is for uncovered edge case
+  B18 (journal ring buffer) — internal-only
 
-Phase B (performance):
-  B18 (trivial, do first)
-  B13/B16 (Property dedup)
-  B14 (DynamicForEach)
-  B15 (DiffableContainer)
-  B17 (lazy modifiers — evaluate risk first)
+Phase A — Medium risk (need regression tests first):
+  A6 (sheet constraint-only) — gesture behavior change, manual QA needed
+  A7 (cancelBag thread safety) — additive sync on NSObject extension
+  A9 (router weak keys)    — dictionary type change, 1 consumer
+  A10 (scope child cleanup) — actor-internal
+  A11 (output buffer config) — runtime bridge change
 
-Phase C (architecture):
+Phase B — Opt-in performance:
+  B13 (Property dedup flag) — opt-in, not default
+  B14 (DynamicForEach)      — new type, no existing code affected
+  B15 (DiffableContainer)   — new type, no existing code affected
+
+Deferred:
+  A8 (CancelBag pruning)   — protocol change, high surface area
+  A12 (retain cycle docs)  — education item
+  B17 (lazy modifiers)     — removed, too risky
+
+Phase C (future):
   Design RFC → Prototype → Migration guide → Implementation
 ```
 
@@ -380,10 +394,97 @@ Phase C (architecture):
 
 ---
 
+## Regression Strategy
+
+### Usage Audit Results
+
+A full codebase audit determined actual usage of each affected API:
+
+| API | Call Sites | In Sources | In Tests | In Demo | Regression Risk |
+|-----|-----------|-----------|---------|---------|-----------------|
+| `.delay(` | 0 | 0 | 0 | 0 | **None** |
+| `.flatMapLatest(` | 0 | 0 | 0 | 0 | **None** |
+| `ForEach(` | 0 (def only) | 0 | 0 | 0 | **None** |
+| `SheetController` | 1 | 1 | 0 | 0 | Low |
+| `.onRoute(` | 4 | 0 | 2 | 2 | Moderate |
+| `showToast`/`ToastManager` | ~10 | 5 | 8 | 2 | Moderate |
+| `DynamicContainerView` | 4 | 2 | 0 | 2 | Moderate |
+| `.distinctUntilChanged()` | 6 | 4 | 1 | 1 | **High** |
+| `cancelBag` | ~40 | ~28 | ~2 | ~3 | **High** (volume) |
+| `outputStream`/`outputs` | 5 | 3 | 2 | 0 | **High** (critical path) |
+
+### Concreteness Assessment
+
+**Confirmed bugs (100% reproducible, no usage needed to trigger):**
+- A1: Sheet onDismiss — any app using `SheetController.onDismiss` + dimming tap
+- A2: Toast containment — any toast VC relying on lifecycle methods
+- A4: `delay` shadowing — the parameter is provably dead code (read the source)
+- A6: Sheet transform/constraint — fast gesture interruption causes visible jump
+
+**Confirmed bugs (require specific usage pattern):**
+- A3: `.onRoute` overwrite — only if called twice on same view (2 test sites use it once each, safe)
+- A5: `flatMapLatest` race — only under concurrent emission (0 consumers exist)
+
+**Defensive improvements (may never manifest in practice):**
+- A7: CancelBag lazy init — all 40 usages are from main thread
+- A8: CancelBag pruning — growth is bounded by view lifecycle
+- A9: Router strong keys — only if router outlives nav controller
+- A10: RuntimeScope child leak — only for long-lived parent scopes
+- A11: Output buffer — only under burst of >50 outputs
+- A12: Retain cycle docs — education, not a code fix
+
+### Revised Risk Classification
+
+Based on the audit, items are reclassified:
+
+**Safe to fix (zero or trivial regression risk):**
+- A1 (additive wiring, 1 call site)
+- A2 (additive containment, tested path)
+- A4 (0 consumers — nobody uses `.delay`)
+- A5 (0 consumers — nobody uses `.flatMapLatest`)
+- B18 (internal-only, no API change)
+
+**Low risk (few consumers, existing tests cover the path):**
+- A3 (2 test sites, both use `.onRoute` once — fix is about the double-call case)
+- A6 (1 call site in Router, gesture behavior change needs manual QA)
+
+**Medium risk (moderate consumer count, needs new tests first):**
+- A7 (touches NSObject extension used by ~40 sites, but change is additive sync)
+- A9 (1 internal consumer, but changes dictionary type)
+- A10 (actor-internal, no public API change)
+- A11 (changes stream buffer, affects runtime bridge)
+
+**High risk (defer or make opt-in):**
+- A8 (requires protocol change to `AnyCancellableLifecycle` — touches 40+ sites)
+- B13/B16 (Property dedup — 6 sites already manually deduplicate; making it default could cause double-dedup or break notification-on-every-set expectations)
+- B17 (lazy modifiers — changes timing of all modifier side effects, ~28 cancelBag sites affected)
+
+### Regression Prevention Protocol
+
+For each fix, in order:
+
+1. **Run baseline:** `swift test` must pass before any changes
+2. **Write regression test first:** Prove the current (broken) behavior exists, then fix it
+3. **Verify no call-site breakage:** For items with consumers, grep for usage and verify each site is unaffected
+4. **Run full suite after each fix:** `swift test` must pass after every individual commit
+5. **Manual QA for gesture/animation items (A6):** Automated tests cannot fully validate visual continuity
+
+### Items Removed or Deferred
+
+| Item | Decision | Reason |
+|------|----------|--------|
+| A8 (CancelBag pruning) | **Deferred to Phase B** | Requires `AnyCancellableLifecycle` protocol change; high surface area |
+| A12 (retain cycle docs) | **Deferred** | Education, not a code fix; do alongside Phase B |
+| B13/B16 (Property dedup) | **Opt-in only** | Must not change default behavior; add `Property(_, deduplicate: true)` flag |
+| B17 (lazy modifiers) | **Removed** | Regression risk too high for benefit; belongs in Phase C |
+
+---
+
 ## Success Criteria
 
-- All existing tests pass after each fix
-- New tests added for each Phase A item
+- All existing tests pass after each fix (`swift test` green)
+- New regression test added for each Phase A item before the fix is applied
 - No API breaking changes in Phase A
-- Phase B items are opt-in or additive
+- Phase B items are opt-in or additive (no default behavior changes)
 - `swift build` and `swift test` green at every commit
+- Items with >0 consumers verified at each call site post-fix
