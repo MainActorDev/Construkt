@@ -517,6 +517,33 @@ struct OperatorTests {
         lock.unlock()
         #expect(finalValues == [0, 42], "New value should arrive after delay")
     }
+    
+    // MARK: flatMapLatest
+    
+    @Test("flatMapLatest cancels previous inner subscription")
+    func flatMapLatestCancelsPrevious() {
+        let source = Property<Int>(0)
+        let bag = CancelBag()
+        var received: [String] = []
+
+        let mapped = source.flatMapLatest { value -> AnyViewBinding<String> in
+            let inner = Property<String>("inner-\(value)")
+            return inner.eraseToAnyViewBinding()
+        }
+
+        mapped.observe(on: nil) { value in
+            received.append(value)
+        }.store(in: bag)
+
+        // Initial: source emits 0, flatMapLatest subscribes to inner Property("inner-0")
+        #expect(received == ["inner-0"])
+
+        source.wrappedValue = 1
+        #expect(received == ["inner-0", "inner-1"])
+
+        source.wrappedValue = 2
+        #expect(received == ["inner-0", "inner-1", "inner-2"])
+    }
 }
 
 // MARK: - EraseToAnyViewBinding Tests

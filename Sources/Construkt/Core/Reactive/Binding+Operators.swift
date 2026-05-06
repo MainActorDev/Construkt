@@ -284,13 +284,18 @@ public extension ViewBinding {
     @_disfavoredOverload
     func flatMapLatest<T>(_ transform: @escaping (Value) -> AnyViewBinding<T>) -> AnyViewBinding<T> {
         return AnyViewBinding<T> { queue, handler in
+            let lock = NSLock()
             var innerCancellable: AnyCancellableLifecycle?
             return self.observe(on: queue) { value in
+                lock.lock()
                 innerCancellable?.cancel()
+                lock.unlock()
                 let inner = transform(value)
+                lock.lock()
                 innerCancellable = inner.observe(on: queue) { innerValue in
                     handler(innerValue)
                 }
+                lock.unlock()
             }
         }
     }
