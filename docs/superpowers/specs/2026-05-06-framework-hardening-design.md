@@ -384,13 +384,14 @@ Phase C (future):
 
 | Item | Fix |
 |------|-----|
-| `RouteChannel.shared` deadlock risk | Replace `DispatchQueue.main.sync` with async pattern or require main-thread access |
+| `RouteChannel.shared` deadlock risk | Add `dispatchPrecondition(condition: .onQueue(.main))` assertion instead of async migration (154 call sites depend on sync delivery) |
 | `SupplementaryRegistrationCache` thread safety | Add `@MainActor` or `NSLock` |
 | `DefaultRouter` not `@MainActor` | Add `@MainActor` annotation |
 | `_ShimmerLayer` deprecated API | Replace `UIScreen.main.scale` with `window?.screen.scale ?? UIScreen.main.scale` |
 | `CellConfigAdapter` debug print | Remove `print("CellConfigAdapter deinit")` |
 | `CompoundCancellable` thread safety | Add `NSLock` around token iteration in `cancel()` |
 | Stale epoch `.drop` documentation | Document that long-running effects with `.drop` strategy will be rejected if any intent fires during execution |
+| `.observe(on: nil)` contract | Add doc comment explicitly stating synchronous delivery is guaranteed when queue is nil (2 production call sites depend on this) |
 
 ---
 
@@ -398,20 +399,36 @@ Phase C (future):
 
 ### Usage Audit Results
 
-A full codebase audit determined actual usage of each affected API:
+A full audit across Construkt itself AND its two production consumers (`ios-consumer`: 30 files, `ios-consumer-intl`: 278 files) determined actual usage:
 
-| API | Call Sites | In Sources | In Tests | In Demo | Regression Risk |
-|-----|-----------|-----------|---------|---------|-----------------|
-| `.delay(` | 0 | 0 | 0 | 0 | **None** |
+| API | Construkt | ios-consumer | ios-consumer-intl | Total | Regression Risk |
+|-----|-----------|-------------|-------------------|-------|-----------------|
+| `.delay(` | 0 | 0 (21 RxSwift) | 0 | 0 | **None** |
 | `.flatMapLatest(` | 0 | 0 | 0 | 0 | **None** |
 | `ForEach(` | 0 (def only) | 0 | 0 | 0 | **None** |
-| `SheetController` | 1 | 1 | 0 | 0 | Low |
-| `.onRoute(` | 4 | 0 | 2 | 2 | Moderate |
-| `showToast`/`ToastManager` | ~10 | 5 | 8 | 2 | Moderate |
-| `DynamicContainerView` | 4 | 2 | 0 | 2 | Moderate |
-| `.distinctUntilChanged()` | 6 | 4 | 1 | 1 | **High** |
-| `cancelBag` | ~40 | ~28 | ~2 | ~3 | **High** (volume) |
-| `outputStream`/`outputs` | 5 | 3 | 2 | 0 | **High** (critical path) |
+| `SheetController` | 1 | 0 (own impl) | 0 (own impl) | 1 | Low |
+| `.onRoute(` | 4 | 4 | 17 | 25 | Moderate |
+| `showToast`/`ToastManager` | ~10 | 0 | 10 | ~20 | Moderate |
+| `DynamicContainerView` | 4 | 0 (uses DynamicObservableViewBuilder: 6) | 1 | 11 | Moderate |
+| `.distinctUntilChanged()` | 6 | 0 (4 RxSwift) | 2 | 8 | **High** |
+| `cancelBag` | ~40 | 2 (bridge) | 11 | ~53 | **High** (volume) |
+| `outputStream`/`outputs` | 5 | 0 | 131 (via FeatureStore) | 136 | **Critical** |
+| `RouteChannel` | 0 | 0 | 154 | 154 | **Critical** |
+| `FeatureStore` | 0 | 0 | 131 (61 files) | 131 | **Critical** |
+| `.observe(on: nil)` sync | 0 | 2 (pagination) | 0 | 2 | **High** (contract) |
+| `ViewBinding` protocol | — | 30 (retroactive) | 278 | 308 | **Critical** |
+
+### Cross-Project Constraints (Non-Negotiable)
+
+Based on the external consumer audit, the following behaviors are **contracts that must not change**:
+
+1. **`ViewBinding.observe(on: nil)` delivers synchronously.** ios-consumer's pagination helper relies on this for synchronous value reads. This is a semantic contract.
+2. **`ViewBinding`/`MutableViewBinding` protocol requirements are frozen.** ios-consumer retroactively conforms RxSwift types to these protocols (30 files). Adding required methods breaks compilation.
+3. **`RouteChannel.send()` delivers synchronously on main thread.** ios-consumer-intl uses synchronous send for critical flows (account deletion confirmation). Do not make async-only.
+4. **`FeatureStore` output delivery order is preserved.** 131 usages across 61 files in ios-consumer-intl depend on outputs arriving in order via the bridge.
+5. **`DynamicContainerView` rebuilds from scratch (no diffing).** ios-consumer-intl's `CustomPageControl` manually controls animations assuming full rebuild. Do not add implicit transitions.
+6. **`.onRoute` single-call-per-view is the only pattern used.** All 25 call sites across both apps use `.onRoute` once per view. The A3 fix (cleanup on overwrite) is safe since nobody double-calls.
+7. **`staleStrategy: .accept` must remain the default.** All 19 features in ios-consumer-intl use `.accept`. Changing the default to `.drop` would silently break all effect feedback.
 
 ### Concreteness Assessment
 
@@ -473,10 +490,12 @@ For each fix, in order:
 
 | Item | Decision | Reason |
 |------|----------|--------|
-| A8 (CancelBag pruning) | **Deferred to Phase B** | Requires `AnyCancellableLifecycle` protocol change; high surface area |
+| A8 (CancelBag pruning) | **Deferred to Phase B** | Requires `AnyCancellableLifecycle` protocol change; 308 files conform to `ViewBinding` — protocol changes are forbidden |
 | A12 (retain cycle docs) | **Deferred** | Education, not a code fix; do alongside Phase B |
-| B13/B16 (Property dedup) | **Opt-in only** | Must not change default behavior; add `Property(_, deduplicate: true)` flag |
+| B13/B16 (Property dedup) | **Opt-in only** | Must not change default behavior; 131 FeatureStore usages depend on current notification semantics |
 | B17 (lazy modifiers) | **Removed** | Regression risk too high for benefit; belongs in Phase C |
+| RouteChannel async migration | **Removed** | 154 call sites in ios-consumer-intl rely on synchronous delivery; deadlock fix must use main-thread assertion only |
+| Output buffer default change | **Removed** | A11 must be opt-in via `RuntimeConfiguration` only; 131 FeatureStore usages in production |
 
 ---
 
