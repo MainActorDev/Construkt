@@ -109,6 +109,63 @@ struct PropertyTests {
         property.wrappedValue = 2  // should not be received
         #expect(received == [0, 1])
     }
+    
+    @Test("Deduplication skips equal values")
+    func deduplicationSkipsEqual() {
+        let property = Property<Int>(0, deduplicate: true)
+        var received: [Int] = []
+        
+        let token = property.observe(on: nil) { value in
+            received.append(value)
+        }
+        
+        property.wrappedValue = 0  // same as initial, should be skipped
+        property.wrappedValue = 1  // different, should broadcast
+        property.wrappedValue = 1  // same, should be skipped
+        property.wrappedValue = 2  // different, should broadcast
+        
+        #expect(received == [0, 1, 2])
+        token.cancel()
+    }
+    
+    @Test("Deduplication disabled by default broadcasts all sets")
+    func deduplicationDisabledByDefault() {
+        let property = Property<Int>(0)
+        var received: [Int] = []
+        
+        let token = property.observe(on: nil) { value in
+            received.append(value)
+        }
+        
+        property.wrappedValue = 0  // same value, but no dedup — should broadcast
+        property.wrappedValue = 0  // same value again — should broadcast
+        property.wrappedValue = 1
+        
+        // 1 initial + 3 sets = 4 total
+        #expect(received == [0, 0, 0, 1])
+        token.cancel()
+    }
+    
+    @Test("Non-Equatable property works without deduplication")
+    func nonEquatablePropertyWorks() {
+        struct Payload {
+            let id: Int
+            let data: String
+        }
+        
+        let property = Property<Payload>(Payload(id: 1, data: "a"))
+        var received: [Int] = []
+        
+        let token = property.observe(on: nil) { value in
+            received.append(value.id)
+        }
+        
+        property.wrappedValue = Payload(id: 2, data: "b")
+        property.wrappedValue = Payload(id: 3, data: "c")
+        
+        #expect(received == [1, 2, 3])
+        token.cancel()
+    }
 }
 
 // MARK: - Signal Tests

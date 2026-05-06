@@ -15,6 +15,7 @@ public final class Property<T>: MutableViewBinding {
     private var _value: T
     private var observers: [UUID: Observer] = [:]
     private let lock = NSRecursiveLock()
+    private let shouldSkip: ((T, T) -> Bool)?
     
     private struct Observer {
         let queue: DispatchQueue?
@@ -30,6 +31,10 @@ public final class Property<T>: MutableViewBinding {
         }
         set {
             lock.lock()
+            if let shouldSkip = shouldSkip, shouldSkip(_value, newValue) {
+                lock.unlock()
+                return
+            }
             _value = newValue
             let currentObservers = observers.values
             lock.unlock()
@@ -52,6 +57,13 @@ public final class Property<T>: MutableViewBinding {
     /// Creates a new property with the given initial value.
     public init(_ value: T) {
         self._value = value
+        self.shouldSkip = nil
+    }
+    
+    /// Designated initializer with an optional skip predicate for deduplication.
+    private init(_ value: T, skipPredicate: ((T, T) -> Bool)?) {
+        self._value = value
+        self.shouldSkip = skipPredicate
     }
     
     /// Subscribes to value changes, immediately emitting the current value to the new observer.
@@ -85,6 +97,16 @@ public final class Property<T>: MutableViewBinding {
         observers.removeValue(forKey: id)
     }
     
+}
+
+// MARK: - Equatable Deduplication
+
+extension Property where T: Equatable {
+    /// Creates a property that optionally deduplicates value assignments.
+    /// When `deduplicate` is `true`, setting the same value will not broadcast to observers.
+    public convenience init(_ value: T, deduplicate: Bool) {
+        self.init(value, skipPredicate: deduplicate ? { $0 == $1 } : nil)
+    }
 }
 
 /// Internal lifecycle token for `Property` observations.
