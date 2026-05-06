@@ -37,24 +37,41 @@ public struct RuntimeJournalEntry<Intent: Sendable, Effect: Sendable>: Sendable 
 }
 
 /// Bounded in-memory event log for runtime internals.
+/// Uses a circular buffer for O(1) append and eviction.
 public struct RuntimeJournal<Intent: Sendable, Effect: Sendable>: Sendable {
     private let capacity: Int
-    private var entries: [RuntimeJournalEntry<Intent, Effect>] = []
+    private var buffer: [RuntimeJournalEntry<Intent, Effect>?]
+    private var head: Int = 0
+    private var count: Int = 0
 
     public init(capacity: Int = 300) {
-        self.capacity = max(1, capacity)
+        let cap = max(1, capacity)
+        self.capacity = cap
+        self.buffer = Array(repeating: nil, count: cap)
     }
 
-    /// Appends an event and evicts oldest entry when at capacity.
+    /// Appends an event. O(1) — overwrites oldest entry when at capacity.
     public mutating func append(_ event: RuntimeJournalEvent<Intent, Effect>) {
-        if entries.count == capacity {
-            entries.removeFirst()
+        let index = (head + count) % capacity
+        buffer[index] = .init(event: event)
+
+        if count == capacity {
+            head = (head + 1) % capacity
+        } else {
+            count += 1
         }
-        entries.append(.init(event: event))
     }
 
-    /// Returns a stable copy of all retained entries.
+    /// Returns entries in chronological order.
     public func snapshot() -> [RuntimeJournalEntry<Intent, Effect>] {
-        entries
+        var result: [RuntimeJournalEntry<Intent, Effect>] = []
+        result.reserveCapacity(count)
+        for i in 0..<count {
+            let index = (head + i) % capacity
+            if let entry = buffer[index] {
+                result.append(entry)
+            }
+        }
+        return result
     }
 }
