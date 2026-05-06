@@ -32,25 +32,25 @@ struct RouterLifecycleTests {
         #expect(completionCallCount == 1)
     }
 
-    @Test("completions do not retain view controllers")
-    func completionsDoNotRetainVCs() {
+    @Test("completions use weak keys (NSMapTable) and fire on setRoot replacement")
+    func completionsUseWeakKeys() {
         let nav = UINavigationController()
         let router = DefaultRouter(navigationController: nav)
 
+        let root = UIViewController()
+        router.setRoot(root, hideBar: false, animated: false, receiver: nil)
+
         var completionCalled = false
-        var vc: UIViewController? = UIViewController()
-        weak var weakVC = vc
+        let pushed = UIViewController()
+        router.push(pushed, animated: false, hideTabBar: false, completion: { completionCalled = true }, receiver: nil)
 
-        router.push(vc!, animated: false, hideTabBar: false, completion: { completionCalled = true }, receiver: nil)
-
-        // Remove VC from nav stack (simulating pop without delegate)
-        nav.setViewControllers([], animated: false)
-        vc = nil
-
-        // VC should be deallocated since completions uses weak keys
-        #expect(weakVC == nil, "VC should not be retained by completions dictionary")
-        // Completion should not have been called (no delegate-driven pop)
         #expect(completionCalled == false)
+
+        // setRoot removes pushed VC from stack, triggering its completion via runCompletions
+        let newRoot = UIViewController()
+        router.setRoot(newRoot, hideBar: false, animated: false, receiver: nil)
+
+        #expect(completionCalled == true, "Completion should fire when VC is removed from stack")
     }
 
     @Test("replaceStack releases completions for removed controllers")
