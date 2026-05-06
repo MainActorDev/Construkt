@@ -11,10 +11,12 @@ public actor RuntimeScope {
     private var cancellables: [UUID: @Sendable () -> Void] = [:]
     private var children: [UUID: RuntimeScope] = [:]
     private var isShutDown = false
+    private var parent: RuntimeScope?
 
-    public init(id: UUID = UUID(), parentID: UUID? = nil) {
+    public init(id: UUID = UUID(), parentID: UUID? = nil, parent: RuntimeScope? = nil) {
         self.id = id
         self.parentID = parentID
+        self.parent = parent
     }
 
     /// Creates a root scope for a feature tree.
@@ -26,7 +28,7 @@ public actor RuntimeScope {
     ///
     /// If parent has already shut down, the child is shut down immediately.
     public func makeChild() -> RuntimeScope {
-        let child = RuntimeScope(parentID: id)
+        let child = RuntimeScope(parentID: id, parent: self)
         children[child.id] = child
 
         if isShutDown {
@@ -36,6 +38,11 @@ public actor RuntimeScope {
         }
 
         return child
+    }
+
+    /// Removes a child scope from this scope's children dictionary.
+    public func removeChild(id: UUID) {
+        children[id] = nil
     }
 
     /// Registers a cancellation closure under a token.
@@ -73,6 +80,11 @@ public actor RuntimeScope {
 
         isShutDown = true
 
+        // Remove self from parent's children to prevent leak.
+        let parentRef = parent
+        parent = nil
+        await parentRef?.removeChild(id: self.id)
+
         let cancelHandlers = Array(cancellables.values)
         cancellables.removeAll(keepingCapacity: false)
         cancelHandlers.forEach { $0() }
@@ -88,5 +100,10 @@ public actor RuntimeScope {
     /// True after scope has been shut down.
     public func terminated() -> Bool {
         isShutDown
+    }
+
+    /// Number of currently registered child scopes (internal for testing).
+    func childCount() -> Int {
+        children.count
     }
 }
