@@ -93,9 +93,20 @@ private struct EmptyCancellable: AnyCancellableLifecycle {
 
 /// Groups multiple cancellables into one lifecycle token.
 private final class CompoundCancellable: AnyCancellableLifecycle {
-    private let tokens: [AnyCancellableLifecycle]
-    init(_ tokens: [AnyCancellableLifecycle]) { self.tokens = tokens }
-    func cancel() { tokens.forEach { $0.cancel() } }
+    private var tokens: [AnyCancellableLifecycle]
+    private let lock = NSLock()
+    
+    init(_ tokens: [AnyCancellableLifecycle]) {
+        self.tokens = tokens
+    }
+    
+    func cancel() {
+        lock.lock()
+        let currentTokens = tokens
+        tokens = []
+        lock.unlock()
+        currentTokens.forEach { $0.cancel() }
+    }
 }
 
 public extension ViewBinding {

@@ -75,6 +75,7 @@ private final class CompletionBox {
     init(_ closure: @escaping () -> Void) { self.closure = closure }
 }
 
+@MainActor
 public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControllerDelegate {
     public let navigationController: UINavigationController
     private var completions: NSMapTable<UIViewController, CompletionBox> = .weakToStrongObjects()

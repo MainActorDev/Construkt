@@ -37,7 +37,11 @@ final class _ShimmerLayer: CAGradientLayer {
     override init() {
         super.init()
         needsDisplayOnBoundsChange = true
-        rasterizationScale = UIScreen.main.scale
+        if #available(iOS 17.0, *) {
+            rasterizationScale = UITraitCollection.current.displayScale
+        } else {
+            rasterizationScale = UIScreen.main.scale
+        }
         shouldRasterize = false
         type = .axial
     }

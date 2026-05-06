@@ -76,6 +76,7 @@ public final class RouteChannel<Event> {
     /// - Returns: `true` if at least one listener handled the event.
     @discardableResult
     public func send(_ event: Event, sender: UIResponder? = nil) -> Bool {
+        dispatchPrecondition(condition: .onQueue(.main))
         // Purge stale (deallocated owner) listeners
         listeners.removeAll { !$0.isAlive }
 

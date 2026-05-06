@@ -55,8 +55,6 @@ public final class CellConfigAdapter: NSObject, CollectionDelegate {
         indexPaths.compactMap(item).forEach { $0.cancelPrefetch() }
     }
     
-    deinit {
-        print("CellConfigAdapter deinit")
-    }
+
 }
 
