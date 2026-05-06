@@ -208,7 +208,8 @@ public final class SheetController: UIViewController {
         case .changed:
             let newBottom = max(0, panStartBottomConstant + translation.y)
             let clampedBottom = newBottom < 0 ? newBottom * 0.2 : newBottom
-            containerView.transform = CGAffineTransform(translationX: 0, y: clampedBottom)
+            containerBottomConstraint?.constant = clampedBottom
+            view.layoutIfNeeded()
             
         case .ended, .cancelled, .failed:
             let projectedTranslation = translation.y + velocity.y * 0.15
@@ -251,7 +252,6 @@ public final class SheetController: UIViewController {
     }
     
     private func animateToBottomOffset(_ offset: CGFloat, velocity: CGFloat = 0) {
-        containerView.transform = .identity
         containerBottomConstraint?.constant = offset
         
         UIView.animate(withDuration: config.baseDuration,
@@ -270,13 +270,14 @@ public final class SheetController: UIViewController {
             containerView.layer.removeAllAnimations()
         case .changed:
             if translation.x > 0 {
-                containerView.transform = CGAffineTransform(translationX: translation.x, y: 0)
+                containerLeadingConstraint?.constant = panStartLeadingConstant + translation.x
+                view.layoutIfNeeded()
             }
         case .ended, .cancelled, .failed:
             if translation.x > view.bounds.width * 0.25 || velocity.x > 500 {
                 dismissSheet()
             } else {
-                containerView.transform = .identity
+                containerLeadingConstraint?.constant = panStartLeadingConstant
                 UIView.animate(withDuration: config.baseDuration) {
                     self.view.layoutIfNeeded()
                 }
