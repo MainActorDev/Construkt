@@ -48,10 +48,14 @@ public extension AnyCancellableLifecycle {
 
 public extension NSObject {
     fileprivate static var ViewBindingCancelBagKey: UInt8 = 0
+    fileprivate static let cancelBagInitLock = NSLock()
     
     /// Returns a generic `CancelBag` stored dynamically on the `NSObject` class via the Objective-C runtime.
     /// This is the native, zero-dependency alternative to `rxDisposeBag`.
     var cancelBag: CancelBag {
+        NSObject.cancelBagInitLock.lock()
+        defer { NSObject.cancelBagInitLock.unlock() }
+        
         if let bag = objc_getAssociatedObject(self, &NSObject.ViewBindingCancelBagKey) as? CancelBag {
             return bag
         }

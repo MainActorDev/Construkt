@@ -195,6 +195,26 @@ struct CancelBagTests {
         
         #expect(cancelled)
     }
+    
+    @Test("cancelBag lazy init is thread-safe")
+    func cancelBagThreadSafety() async {
+        let object = NSObject()
+        
+        await withTaskGroup(of: ObjectIdentifier.self) { group in
+            for _ in 0..<100 {
+                group.addTask {
+                    ObjectIdentifier(object.cancelBag)
+                }
+            }
+            
+            var ids = Set<ObjectIdentifier>()
+            for await id in group {
+                ids.insert(id)
+            }
+            
+            #expect(ids.count == 1, "All accesses should return the same CancelBag instance")
+        }
+    }
 }
 
 // MARK: - Operator Tests
