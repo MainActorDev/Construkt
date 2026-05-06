@@ -116,6 +116,11 @@ public extension ModifiableView where Base: UIView {
     @discardableResult
     func onRoute<E>(_ event: @autoclosure @escaping () -> E) -> ViewModifier<Base> {
         return self.with { view in
+            // Remove previous route gesture if any
+            if let oldGesture = objc_getAssociatedObject(view, &RouteAssociator.routeGestureKey) as? UIGestureRecognizer {
+                view.removeGestureRecognizer(oldGesture)
+            }
+            
             let target = RouteTapTarget(view: view, eventProvider: event)
             
             objc_setAssociatedObject(
@@ -128,12 +133,21 @@ public extension ModifiableView where Base: UIView {
             let tapGesture = UITapGestureRecognizer(target: target, action: #selector(RouteTapTarget<Any>.handleTap))
             view.addGestureRecognizer(tapGesture)
             view.isUserInteractionEnabled = true
+            
+            // Store gesture for cleanup on next call
+            objc_setAssociatedObject(
+                view,
+                &RouteAssociator.routeGestureKey,
+                tapGesture,
+                .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+            )
         }
     }
 }
 
 private struct RouteAssociator {
     static var routeTargetKey: UInt8 = 0
+    static var routeGestureKey: UInt8 = 0
 }
 
 private final class RouteTapTarget<E>: NSObject {

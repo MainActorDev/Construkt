@@ -195,6 +195,19 @@ struct EventRoutingTests {
         #expect(handled == false)
         #expect(received == false)
     }
+    @Test("onRoute replaces previous gesture without orphaning")
+    func onRouteReplacesGesture() {
+        let view = UIView()
+        
+        // Apply first route
+        let _ = ViewModifier(view).onRoute("first")
+        #expect(view.gestureRecognizers?.count == 1)
+        
+        // Apply second route — should replace, not accumulate
+        let _ = ViewModifier(view).onRoute("second")
+        #expect(view.gestureRecognizers?.count == 1, "Second .onRoute should replace the first gesture, not add another")
+    }
+    
     @Test("RouteChannel.shared returns the same instance for the same event type")
     func testRouteChannelSharedSingleton() {
         let channel1 = RouteChannel<TestRoute>.shared
