@@ -81,7 +81,7 @@ public final class ToastManager {
         setupContainerIfNeeded(in: window)
         
         let toast = ToastItem(content: content, config: config)
-        let toastView = createToastView(for: toast, config: config)
+        let toastView = createToastView(for: toast, config: config, parent: window.rootViewController)
         
         containerView?.addSubview(toastView)
         activeToasts.append((toast, toastView))
@@ -140,9 +140,9 @@ public final class ToastManager {
         containerView = container
     }
     
-    private func createToastView(for toast: ToastItem, config: ToastConfiguration) -> ToastItemView {
+    private func createToastView(for toast: ToastItem, config: ToastConfiguration, parent: UIViewController?) -> ToastItemView {
         let toastView = ToastItemView(config: config)
-        toastView.setContent(toast.contentViewController, in: nil)
+        toastView.setContent(toast.contentViewController, in: parent)
         
         toastView.onTap = { [weak self, weak toast] in
             guard let self = self, let toast = toast else { return }
