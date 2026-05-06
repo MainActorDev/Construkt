@@ -370,7 +370,9 @@ extension SheetController: UIGestureRecognizerDelegate {
 
 extension SheetController: UIViewControllerTransitioningDelegate {
     public func presentationController(forPresented presented: UIViewController, presenting: UIViewController?, source: UIViewController) -> UIPresentationController? {
-        SheetPresentationController(presentedViewController: presented, presenting: presenting, config: config)
+        let pc = SheetPresentationController(presentedViewController: presented, presenting: presenting, config: config)
+        pc.onDismiss = { [weak self] in self?.onDismiss?() }
+        return pc
     }
     
     public func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
