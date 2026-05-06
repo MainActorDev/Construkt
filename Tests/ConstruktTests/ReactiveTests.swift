@@ -474,6 +474,49 @@ struct OperatorTests {
         _ = expectation.wait(timeout: .now() + 0.05)
         #expect(received == [1, 4])
     }
+    
+    // MARK: delay
+    
+    @Test("delay schedules on specified queue")
+    func delaySchedulesOnSpecifiedQueue() async throws {
+        let property = Property<Int>(0)
+        var received: [Int] = []
+        let lock = NSLock()
+        let bag = CancelBag()
+        
+        let delayQueue = DispatchQueue(label: "test.delay.queue")
+        let delayed = property.delay(0.05, on: delayQueue)
+        
+        delayed.observe(on: nil) { value in
+            lock.lock()
+            received.append(value)
+            lock.unlock()
+        }.store(in: bag)
+        
+        // Initial value (0) should be delayed
+        lock.lock()
+        let immediateValues = received
+        lock.unlock()
+        #expect(immediateValues.isEmpty, "Value should not arrive immediately")
+        
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        lock.lock()
+        let afterDelay = received
+        lock.unlock()
+        #expect(afterDelay == [0], "Delayed value should arrive after interval")
+        
+        property.wrappedValue = 42
+        lock.lock()
+        let afterSet = received
+        lock.unlock()
+        #expect(afterSet == [0], "New value should not arrive immediately")
+        
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        lock.lock()
+        let finalValues = received
+        lock.unlock()
+        #expect(finalValues == [0, 42], "New value should arrive after delay")
+    }
 }
 
 // MARK: - EraseToAnyViewBinding Tests

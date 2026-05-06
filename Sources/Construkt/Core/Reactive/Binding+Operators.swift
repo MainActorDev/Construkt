@@ -270,10 +270,10 @@ public extension ViewBinding {
     
     /// Delays each emitted value by the specified time interval before forwarding it.
     @_disfavoredOverload
-    func delay(_ interval: TimeInterval, on queue: DispatchQueue = .main) -> AnyViewBinding<Value> {
-        return AnyViewBinding { queue, handler in
-            self.observe(on: queue) { value in
-                queue?.asyncAfter(deadline: .now() + interval) {
+    func delay(_ interval: TimeInterval, on schedulerQueue: DispatchQueue = .main) -> AnyViewBinding<Value> {
+        return AnyViewBinding { observerQueue, handler in
+            self.observe(on: observerQueue) { value in
+                schedulerQueue.asyncAfter(deadline: .now() + interval) {
                     handler(value)
                 }
             }
