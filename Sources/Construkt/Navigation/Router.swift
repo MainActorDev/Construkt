@@ -70,9 +70,14 @@ public extension ConstruktRouter {
     }
 }
 
+private final class CompletionBox {
+    let closure: () -> Void
+    init(_ closure: @escaping () -> Void) { self.closure = closure }
+}
+
 public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControllerDelegate {
     public let navigationController: UINavigationController
-    private var completions: [UIViewController: () -> Void] = [:]
+    private var completions: NSMapTable<UIViewController, CompletionBox> = .weakToStrongObjects()
     
     public init(navigationController: UINavigationController = UINavigationController()) {
         self.navigationController = navigationController
@@ -94,7 +99,7 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
         vc.associatedCoordinator = receiver
         vc.hidesBottomBarWhenPushed = hideTabBar
         if let completion = completion {
-            completions[vc] = completion
+            completions.setObject(CompletionBox(completion), forKey: vc)
         }
         navigationController.pushViewController(vc, animated: animated)
     }
@@ -175,7 +180,7 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
         }
         
         if let completion = completion, let topVC = newStack.last {
-            completions[topVC] = completion
+            completions.setObject(CompletionBox(completion), forKey: topVC)
         }
         
         navigationController.setViewControllers(newStack, animated: animated)
@@ -191,8 +196,9 @@ public final class DefaultRouter: NSObject, ConstruktRouter, UINavigationControl
     }
     
     private func runCompletion(for vc: UIViewController) {
-        if let completion = completions.removeValue(forKey: vc) {
-            completion()
+        if let box = completions.object(forKey: vc) {
+            completions.removeObject(forKey: vc)
+            box.closure()
         }
     }
 
