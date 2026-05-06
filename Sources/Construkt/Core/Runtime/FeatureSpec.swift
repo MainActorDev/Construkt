@@ -231,8 +231,16 @@ public struct RuntimeConfiguration: Sendable {
     /// Whether newly attached state streams immediately receive current state.
     public var emitsInitialStateOnSubscription: Bool
 
-    public init(journalCapacity: Int = 300, emitsInitialStateOnSubscription: Bool = true) {
+    /// Buffer capacity for the output async stream (`.bufferingNewest` policy).
+    public var outputBufferSize: Int
+
+    public init(
+        journalCapacity: Int = 300,
+        emitsInitialStateOnSubscription: Bool = true,
+        outputBufferSize: Int = 50
+    ) {
         self.journalCapacity = max(1, journalCapacity)
         self.emitsInitialStateOnSubscription = emitsInitialStateOnSubscription
+        self.outputBufferSize = max(1, outputBufferSize)
     }
 }

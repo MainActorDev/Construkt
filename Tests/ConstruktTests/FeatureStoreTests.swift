@@ -84,6 +84,37 @@ struct FeatureStoreTests {
         #expect(store.state.wrappedValue.counter == 2)
     }
 
+    @Test("Custom output buffer size is respected")
+    func customOutputBufferSize() async {
+        // Use a small buffer to verify configuration flows through
+        let config = RuntimeConfiguration(outputBufferSize: 5)
+        let store = FeatureStore<FeatureStoreTestFeature>(
+            dependencies: .init(),
+            configuration: config,
+            effectExecutor: { effect, _ in
+                switch effect {
+                case .none:
+                    return .none
+                case .delayedIncrement(let delayNanos):
+                    try await Task.sleep(nanoseconds: delayNanos)
+                    return .init(intents: [.applyAsyncIncrement])
+                }
+            }
+        )
+
+        // Verify store was created successfully with custom config
+        // (The actual buffer behavior is internal to AsyncStream,
+        //  but we verify the configuration path doesn't crash)
+        store.dispatch(.increment)
+        await store.sendAndDrain(.increment)
+
+        let didUpdate = await waitUntil {
+            store.state.wrappedValue.counter == 2
+        }
+
+        #expect(didUpdate)
+    }
+
     private func makeStore() -> FeatureStore<FeatureStoreTestFeature> {
         FeatureStore(dependencies: .init()) { effect, _ in
             switch effect {

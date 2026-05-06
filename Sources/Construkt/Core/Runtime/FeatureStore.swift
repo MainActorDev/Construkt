@@ -17,6 +17,7 @@ public final class FeatureStore<F: FeatureSpec> {
     /// One-off output stream suitable for transient events.
     public let outputs: Signal<F.Output>
 
+    private let configuration: RuntimeConfiguration
     private let deliveryQueue: DispatchQueue
     private let lifecycleLock = NSLock()
     private var bridgeReadyTask: Task<Void, Never>?
@@ -33,6 +34,7 @@ public final class FeatureStore<F: FeatureSpec> {
         deliveryQueue: DispatchQueue = .main,
         effectExecutor: @escaping FeatureEffectExecutor<F>
     ) {
+        self.configuration = configuration
         self.runtime = FeatureRuntime(
             initialState: initialState,
             dependencies: dependencies,
@@ -196,10 +198,11 @@ public final class FeatureStore<F: FeatureSpec> {
     /// Starts stream bridge after runtime streams are available.
     private func makeBridgeTask() -> Task<Void, Never> {
         let runtime = self.runtime
+        let bufferSize = configuration.outputBufferSize
 
         return Task { [weak self] in
             let stateStream = await runtime.stateStream()
-            let outputStream = await runtime.outputStream()
+            let outputStream = await runtime.outputStream(bufferingPolicy: .bufferingNewest(bufferSize))
 
             guard let self else {
                 return
